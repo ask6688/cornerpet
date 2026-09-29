@@ -167,6 +167,12 @@ try {
     await page.mouse.up();
     if (drag <= 3) assert.equal(during, hint, 'drag ' + drag + ' explains resizing');
     else assert.notEqual(during, hint, 'the fourth drag is quiet');
+    if (drag === 1) {
+      // Clicking the pet while it explains resizing gets its usual answer instead of the hint.
+      await page.mouse.down();
+      await page.mouse.up();
+      await until(async () => { const text = await page.locator('.pet-bubble').textContent(); return text !== hint && text !== ''; }, 'a click answer instead of the hint');
+    }
     await until(async () => (await page.locator('.pet-bubble').textContent()) !== hint, 'the hint to fade after drag ' + drag);
   }
 

@@ -32,6 +32,9 @@ function DesktopPet() {
     return unsubscribe;
   }, []);
   async function greet() {
+    // A click starts a new exchange: the resize hint gives way to the pet's own words.
+    clearTimeout(hintTimer.current);
+    setHinting(false);
     try {
       const next = await window.cornerpet.interact();
       setBehavior(next);
