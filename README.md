@@ -20,9 +20,13 @@
 
 从六种基础造型里挑一个，换颜色、试材质、选表情。每一次调整都会直接出现在眼前，直到你觉得：“嗯，就是它了。”
 
-![DIY 3D 工作台](docs/assets/diy-studio.png)
-
-![六种 DIY 3D 基础造型的选择界面](docs/assets/diy-shapes.png)
+<table>
+  <tr><th>DIY 3D 工作台</th><th>六种基础造型</th></tr>
+  <tr>
+    <td><img src="docs/assets/diy-studio.png" width="480" alt="DIY 3D 工作台"></td>
+    <td><img src="docs/assets/diy-shapes.png" width="300" alt="六种 DIY 3D 基础造型的选择界面"></td>
+  </tr>
+</table>
 
 六位小伙伴，先用没有配饰的本来面目打个招呼：
 
