@@ -55,7 +55,12 @@ function DesktopPet() {
   const pinch = useRef<Pinch | null>(null);
   const commitPinch = useRef<() => Promise<void>>(async () => {});
   useEffect(() => { viewScale.current = view.scale; }, [view.scale]);
-  useEffect(() => window.cornerpet.onResizeHint(() => { clearTimeout(hintTimer.current); setHinting(true); }), []);
+  useEffect(() => window.cornerpet.onResizeHint(() => {
+    clearTimeout(hintTimer.current);
+    setHinting(true);
+    // A quick flick is recognised only as the drag ends; the hint must still fade.
+    if (!pressed.current) hintTimer.current = setTimeout(() => setHinting(false), 3000);
+  }), []);
   useEffect(() => {
     window.cornerpet.getScaleOptions().then(options => { limits.current = { min: options.min, max: options.max }; }).catch(() => {});
     function show(text: string, linger = false) {
@@ -157,6 +162,8 @@ function DesktopPet() {
     try {
       // Saving a size ends any drag, so a pinch still settling is saved before this one begins.
       await commitPinch.current();
+      // A quick tap can end while that save is still running; then there is no drag to start.
+      if (!pressed.current) return;
       await window.cornerpet.startDrag();
     }
     catch { pressed.current = false; setError('拖动暂时不可用'); }
