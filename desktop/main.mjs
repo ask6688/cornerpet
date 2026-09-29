@@ -5,7 +5,7 @@ import { PET, parseLaunchUrl } from '../shared/pet-config.mjs';
 import { DESKTOP_SIZE, DEFAULT_FOOTPRINT, validFootprint, containPet, desktopDragPosition, resizedPetBounds, visibleViewport, desktopScaleLimits } from './layout.mjs';
 import { createHandoffServer, parseDesktopPackage } from './handoff.mjs';
 import { createPetStorage, readPetFile } from './pet-storage.mjs';
-import { DEFAULT_HINT_STATE, createResizeHintStore, learnedResizeHint, nextResizeHint } from './resize-hint.mjs';
+import { DEFAULT_HINT_STATE, createResizeHintStore, nextResizeHint } from './resize-hint.mjs';
 
 import { createPetStateMachine } from '../shared/pet-state.mjs';
 
@@ -319,7 +319,6 @@ async function setPetScale(scale) {
   launchPet = next;
   previewScale = undefined;
   previewOwner = undefined;
-  if (!hintState.learned) saveHintState(learnedResizeHint(hintState));
   resizeWindow(renderScale);
   updateTray();
   return scale;

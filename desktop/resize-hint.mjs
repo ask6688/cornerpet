@@ -2,22 +2,18 @@ import path from 'node:path';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 
 export const RESIZE_HINT_LIMIT = 3;
-export const DEFAULT_HINT_STATE = Object.freeze({ shown: 0, learned: false });
+export const DEFAULT_HINT_STATE = Object.freeze({ shown: 0 });
 
 export function normalizeHintState(value) {
   const shown = Number.isInteger(value?.shown) && value.shown >= 0 ? Math.min(value.shown, RESIZE_HINT_LIMIT) : 0;
-  return Object.freeze({ shown, learned: value?.learned === true });
+  return Object.freeze({ shown });
 }
 
-// The pet explains resizing a few times, and never again once someone has used it.
+// The pet explains resizing on the first few drags, whether or not someone has resized it yet.
 export function nextResizeHint(state, { sleeping = false, pinching = false } = {}) {
   const current = normalizeHintState(state);
-  if (current.learned || current.shown >= RESIZE_HINT_LIMIT || sleeping || pinching) return { show: false, state: current };
+  if (current.shown >= RESIZE_HINT_LIMIT || sleeping || pinching) return { show: false, state: current };
   return { show: true, state: Object.freeze({ ...current, shown: current.shown + 1 }) };
-}
-
-export function learnedResizeHint(state) {
-  return Object.freeze({ ...normalizeHintState(state), learned: true });
 }
 
 export function createResizeHintStore(directory) {
