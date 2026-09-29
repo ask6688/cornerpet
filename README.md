@@ -2,154 +2,198 @@
 
 **一只住在桌角的小生命。**
 
-用户可以自己捏一只角色，或把喜欢的照片变成桌角伙伴，再把它带到 macOS 桌面陪伴自己。CornerPet 探索的是一种安静、低打扰、由用户亲手建立情感连接的桌面陪伴体验。
+捏一只软乎乎的小家伙，或把喜欢的照片变成桌角伙伴。给它起个名字，再把它从网页带到 Mac 桌面：你忙的时候它自己发呆，点一点，它就回应你。
 
-每天打开电脑，桌角总是空着。开场短片讲的是：那里慢慢出现一只小生命；它会发呆、睡觉，偶尔回应你，陪伴从此有了一个不打扰人的位置。用户先亲手创造它，再决定如何让它留下来。
+**[在线领养一只](https://cornerpet-companion.netlify.app/) · [下载 macOS 桌面版](https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg)**
 
-**核心路径：** DIY 3D 或照片本地抠图 → 预览、命名、保存 → 带到 macOS 桌角互动。
+## Preview
 
-## 1. Preview
+### 故事从一个空桌角开始
 
-**先看 21 秒开场故事：** [播放原始短片](docs/assets/story-opening.mp4)。下方动图取自同一段实际录屏。
+每天打开电脑，桌角总是空着。如果那里住着一只小生命呢？它探头看看你，打个盹，然后安静地留下来。CornerPet 的开场小故事，把这个念头变成了 21 秒的相遇。
 
 [![CornerPet 开场故事：空桌角出现一只安静陪伴的小生命](docs/assets/story-opening.gif)](docs/assets/story-opening.mp4)
 
-画面里的小团从一个空桌角出现，先好奇地张望，再短暂入睡，最后留在角落陪你。这是产品想交付的情绪和节奏：有存在感，也允许用户继续专注自己的事。
+[播放完整开场短片](docs/assets/story-opening.mp4)
 
-### 从创建到桌角
+### 先捏出它的样子
+
+从六种基础造型里挑一个，换颜色、试材质、选表情。每一次调整都会直接出现在眼前，直到你觉得：“嗯，就是它了。”
 
 ![DIY 3D 工作台](docs/assets/diy-studio.png)
 
-| 照片创建入口 | 命名与保存完成页 |
-| --- | --- |
-| ![照片创建页](docs/assets/photo-creator.png) | ![命名与保存完成页](docs/assets/finish.png) |
+![六种 DIY 3D 基础造型的选择界面](docs/assets/diy-shapes.png)
 
-DIY 工作台提供六种 3D 基础造型，下面是创建页中的实际选择界面：
+六位小伙伴，先用没有配饰的本来面目打个招呼：
 
-![六种 DIY 3D 基础造型](docs/assets/diy-shapes.png)
+<table>
+  <tr>
+    <th>糯米团</th><th>草莓团</th><th>小吐司</th><th>云朵</th><th>布丁</th><th>小蘑菇</th>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/models/mochi.png" width="125" alt="无配饰的糯米团 3D 造型"></td>
+    <td><img src="docs/assets/models/strawberry.png" width="125" alt="无配饰的草莓团 3D 造型"></td>
+    <td><img src="docs/assets/models/toast.png" width="125" alt="无配饰的小吐司 3D 造型"></td>
+    <td><img src="docs/assets/models/cloud.png" width="125" alt="无配饰的云朵 3D 造型"></td>
+    <td><img src="docs/assets/models/pudding.png" width="125" alt="无配饰的布丁 3D 造型"></td>
+    <td><img src="docs/assets/models/mushroom.png" width="125" alt="无配饰的小蘑菇 3D 造型"></td>
+  </tr>
+</table>
 
-| 糯米团 | 草莓团 | 小吐司 |
-| --- | --- | --- |
-| ![糯米团 3D 造型](docs/assets/models/mochi.png) | ![草莓团 3D 造型](docs/assets/models/strawberry.png) | ![小吐司 3D 造型](docs/assets/models/toast.png) |
-| 云朵 | 布丁 | 小蘑菇 |
-| ![云朵 3D 造型](docs/assets/models/cloud.png) | ![布丁 3D 造型](docs/assets/models/pudding.png) | ![小蘑菇 3D 造型](docs/assets/models/mushroom.png) |
+### 也可以，把熟悉的它带来
 
-照片路径的这组对比以同一张**合成测试猫照片**为起点。本地抠图是当前产品的实际结果，毛发边缘可手动修整；最右侧是为说明未来风格方向单独制作的**视觉示意**，不是 CornerPet API 或当前 Demo 根据该照片生成的结果。
+宠物、玩偶，或一件舍不得收起来的小物件。上传照片，选择「保留它」，浏览器会去掉背景；再用橡皮修一修边缘，照片里的它就能以原来的模样陪在桌角。
 
-| 原始照片 | 本地抠图：真实产品结果 | 风格化：独立视觉示意 |
-| --- | --- | --- |
-| ![合成测试猫原图](docs/assets/cat-original.png) | ![同一照片的本地抠图结果](docs/assets/cat-cutout.png) | ![参考同一合成猫制作的风格化概念图，非产品 API 结果](docs/assets/cat-stylized-illustration.png) |
+<table>
+  <tr><th>原始照片</th><th>本地抠图 · 产品实测</th><th>风格化方向 · 独立视觉示意</th></tr>
+  <tr>
+    <td><img src="docs/assets/cat-original.png" width="200" alt="合成测试猫原图"></td>
+    <td><img src="docs/assets/cat-cutout.png" width="200" alt="同一照片在 CornerPet 中的本地抠图结果"></td>
+    <td><img src="docs/assets/cat-stylized-illustration.png" width="200" alt="参考合成猫制作的独立概念图，非 CornerPet 生成结果"></td>
+  </tr>
+</table>
 
-照片风格化的当前预览是两张**固定的原创 Demo 角色**，与上面的猫照片无生成关系。未配置图片 API 时会默认展示这些示例，并在界面标明来源。预览中的表情按钮可演示开心、困困、发呆、害羞、惊讶等反馈；真实照片经 Seedream 生成对应表情的效果仍待验证。
+这组使用合成测试猫素材；右图是单独制作的风格参考。
 
-| 预置 Demo 角色 1 | 预置 Demo 角色 2 |
-| --- | --- |
-| ![麻薯芽预置角色](public/examples/mochi-sprout.png) | ![绒云预置角色](public/examples/plush-cloud.png) |
+想看看软乎乎的另一种模样，可以试试照片路径里的两种风格：
 
-下面五张是**同一个预置 Demo 角色在当前产品里点击表情按钮后的角色局部截图**，展示桌宠如何回应用户；它们不代表上传照片已经生成了五种表情。
+<table>
+  <tr><th>糯米小团 · 预置 Demo</th><th>口袋毛绒 · 预置 Demo</th></tr>
+  <tr>
+    <td><img src="public/examples/mochi-sprout.png" width="220" alt="糯米小团风格的预置 Demo 角色"></td>
+    <td><img src="public/examples/plush-cloud.png" width="220" alt="口袋毛绒风格的预置 Demo 角色"></td>
+  </tr>
+</table>
 
-| 开心 | 困困 | 发呆 |
-| --- | --- | --- |
-| ![Demo 小伙伴开心表情](docs/assets/expressions/happy.png) | ![Demo 小伙伴困困表情](docs/assets/expressions/sleepy.png) | ![Demo 小伙伴发呆表情](docs/assets/expressions/daydream.png) |
-| 害羞 | 惊讶 | |
-| ![Demo 小伙伴害羞表情](docs/assets/expressions/shy.png) | ![Demo 小伙伴惊讶表情](docs/assets/expressions/surprised.png) | |
+同一只 Demo 小伙伴，也有自己的小情绪。下面是产品里的表情预览截图：
 
-桌面宠物的真实 macOS 场景截图尚待补充；不使用合成桌面效果图代替实机截图。
+<table>
+  <tr><th>开心</th><th>困困</th><th>发呆</th><th>害羞</th><th>惊讶</th></tr>
+  <tr>
+    <td><img src="docs/assets/expressions/happy.png" width="125" alt="Demo 小伙伴的开心表情"></td>
+    <td><img src="docs/assets/expressions/sleepy.png" width="125" alt="Demo 小伙伴的困困表情"></td>
+    <td><img src="docs/assets/expressions/daydream.png" width="125" alt="Demo 小伙伴的发呆表情"></td>
+    <td><img src="docs/assets/expressions/shy.png" width="125" alt="Demo 小伙伴的害羞表情"></td>
+    <td><img src="docs/assets/expressions/surprised.png" width="125" alt="Demo 小伙伴的惊讶表情"></td>
+  </tr>
+</table>
 
-## 2. Why I built it
+### 起好名字，就带它回家
 
-桌面上常驻的产品很容易变成新的干扰。CornerPet 从一个产品问题出发：**能否让陪伴存在于日常工作中，同时把控制权留给用户？**
+<table>
+  <tr><th>从照片开始</th><th>它诞生啦</th></tr>
+  <tr>
+    <td><img src="docs/assets/photo-creator.png" width="360" alt="照片创建页"></td>
+    <td><img src="docs/assets/finish.png" width="360" alt="命名、保存后的完成页"></td>
+  </tr>
+</table>
 
-因此，它让用户先参与角色的诞生，再让角色以呼吸、偶尔回应和轻提醒的方式住在桌角。这里展示的是产品原型与设计取舍，不把尚未完成的能力包装成已验证成果。
+点「带它去桌面」，角色就会交给这台 Mac 上的 CornerPet。连接成功，直接送达；没连上，页面会说明原因，并提供安装包入口和重试指引。装好后回到原页面，继续把刚刚创造的小伙伴接回家。
 
-## 3. Core Experience
+## Why I built it
 
-- **亲手创造**：选择 3D 形态、材质、颜色、表情和配饰，实时看到变化。
-- **带来熟悉的它**：上传照片，在浏览器本地去背景并手动修整，做成保留原貌的 2D 伙伴。
-- **留在桌角**：命名、保存、导出 `.cornerpet`，在 macOS 上交给透明置顶的桌宠窗口。
-- **安静互动**：点击、拖动和调整大小；闲置、睡眠、回来欢迎及长时间使用提醒由同一状态机驱动。
+工作时，我们已经有足够多会弹窗、会催促、会要求注意力的产品。我想试着做一只可以安静待在身边的小东西：不用聊很久，不用完成任务，偶尔看一眼，就知道它还在。
 
-## 4. Product Flow
+亲手创造是这段关系的起点。选择它的样子、给它起名字，再亲眼看着它来到桌面，让一个屏幕里的模型慢慢变成“我的那只”。
 
-```text
-选择来处 ── DIY 3D ───────────────┐
-          └─ 照片 → 本地抠图 / 预置 Demo ─┤
-                                       ↓
-                            预览 → 命名 → 本地保存
-                                       ↓
-                        .cornerpet 导出 / 送往 macOS 桌面
-```
+## Core Experience
 
-照片的“预置 Demo”只演示后续体验；它**不会**读取照片特征来生成角色。
+- **捏出喜欢的样子**：六种 3D 造型，搭配材质、颜色、表情和配饰，边选边看。
+- **保留熟悉的模样**：照片本地去背景，支持手动修整，做成透明背景的 2D 伙伴。
+- **真的住到桌角**：保存后直接交给 macOS App，也可以导出 `.cornerpet` 文件留存、导入。
+- **有回应，也会自己待着**：可以点击、拖动、调大小；它会发呆、入睡、醒来打招呼，并在长时间使用时轻轻提醒。
 
-## 5. Key Product Decisions
+## Product Flow
 
-1. **低打扰优先**：默认轻微呼吸与偶发动作，提醒频率受限制；用户可隐藏或退出。
-2. **两条创建路径，一个陪伴体验**：DIY 3D 与照片 2D 共用命名、保存、交接和桌宠互动，避免把照片路径做成孤立的展示页。
-3. **本地优先**：基础体验无需账号。照片保留模式在浏览器内抠图；完整角色留在浏览器或用户自己的 Mac。
-4. **清楚标注 AI 边界**：预置图明确写作 Demo；真实 AI 生成作为可选实验能力，失败时仍能使用基础体验。
+**选一个来处 → 做出它的样子 → 预览、起名、保存 → 带它去桌面 → 开始陪伴**
 
-## 6. What I built
+DIY 路径从基础造型开始；照片路径可以保留原貌，也可以尝试风格化。两条路径汇合到同一个完成页，使用相同的保存、导出与桌面交接流程。第一次使用时，安装引导会在连接失败后出现；已经连接成功的用户可以直接继续。
 
-这个 0→1 原型包含 Web 创建工作台、两种角色路径、统一角色数据、浏览器本地存储、`.cornerpet` 文件、Web 到 Electron 的本机交接，以及 macOS 透明桌宠窗口。仓库保留实现与测试，产品状态以下表为准。
+## Key Product Decisions
 
-## 7. AI in CornerPet
+1. **陪伴的分寸，比动作的数量重要。** 默认用轻微呼吸和偶发回应表达存在感；提醒有频率限制，也可以隐藏或退出。
+2. **让“我的角色”贯穿整个体验。** 创建、命名、保存、带去桌面用的是同一份角色数据，用户的选择不会在换一个页面后消失。
+3. **把安装放在用户需要的时刻。** 先让人创造出喜欢的角色，想带走时再引导安装。交接失败时保留成果，并给出下一步。
+4. **基础体验留在本地。** 不用注册账号；照片保留模式在浏览器里处理，角色保存在浏览器或自己的 Mac 上。
 
-| 用途 | 当前实际状态 |
-| --- | --- |
-| 照片去背景 | 浏览器 Worker 运行 MODNet / U²-NetP；保留原图路径不调用云端图片服务。 |
-| 风格化 Demo | 使用本仓库内的两张原创预置 PNG，上传照片不会影响 Demo 结果。 |
-| Seedream 风格化 | 已有服务端接口与异步任务代码，需部署者自己的火山方舟 `ARK_API_KEY`；配置后点击创建会自动尝试真实生成，但真实照片效果仍待验收。点击生成时，浏览器先抠图，再把主体发送至服务端和豆包。 |
-| 任意照片转可旋转 3D | 未实现。DIY 3D 不等于照片 3D 化。 |
+## What I built
 
-预置 Demo 图与测试猫照片是为此公开候选版重新生成的合成素材，没有参考真实人物肖像。图像生成参与了素材制作；这里不以素材生成证明线上 AI API 已通过验收。
+我把“桌角陪伴”从一个想法做成了可以亲手体验的产品原型：定义两条创建路径，设计开场故事与创建流程，完成 Web 工作台、照片处理、角色保存与导出，再把角色接到 Electron 桌面端。
 
-## 8. Current Status
+从造型调整到桌面互动，从第一次安装到再次打开，仓库里包含这条完整链路的实现与核心逻辑测试。后续迭代也围绕实际体验展开：表情是否自然、按钮是否被遮住、没有 API Key 时是否说得清楚、角色是否真的能到桌面。
 
-| 状态 | 能力 |
-| --- | --- |
-| **已完成** | DIY 3D、照片保留原图的 2D 角色、本地抠图、命名与保存、`.cornerpet` 导出、Web → Desktop 交接、桌宠基础互动与状态机。 |
-| **Demo** | 照片风格化的预置角色；与上传内容无关。 |
-| **Experimental / 待验证** | Seedream 真实 AI 风格化：接口已接入，仍需用真实服务与照片验证结果和部署环境。 |
-| **未实现** | 任意照片 → 可旋转 3D 模型。 |
+## AI in CornerPet
 
-桌面端当前面向 Apple Silicon macOS，提供临时签名的试用 DMG；尚未完成 Developer ID 签名、公证或 Intel Mac 验收。
+AI 一方面参与开发过程，辅助代码实现、展示素材制作和多轮体验调整；另一方面用于产品里的图像处理。照片去背景由浏览器里的 MODNet / U²-NetP 模型完成，照片保留模式无需云端 Key。
 
-## 9. Try it
+风格化预留了 Seedream 服务端接口。部署者配置自己的 `ARK_API_KEY` 后，用户仍然只需点击「创建我的桌角生物」，无需选择“真实生成”模式；未配置时会在创建时说明当前使用预置示例。Key 留在服务端，真实生成会将处理后的图片主体发送给图片服务。
 
-**[在线体验 Web 版](https://cornerpet-companion-test.netlify.app/)**：可以直接捏 3D 角色、上传照片做本地抠图，并体验命名、保存与预置风格化角色。当前测试站未接入可用的图片生成 API Key；点击创建后会说明这次使用预置示例，结果与上传照片无关。基础体验无需账号和 Key。
+## Current Status
 
-**[下载 CornerPet macOS 安装包（Apple Silicon）](https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg)**：在 Web 完成页点「带它去桌面」时，若未能连接桌面 App，页面会说明原因并显示安装包入口。安装并打开 App 一次，回到原页面重试，按浏览器提示允许打开 App 和连接本机。首次打开若提示无法验证开发者，确认下载来源可信后，可在「系统设置 → 隐私与安全性」选择「仍要打开」；若提示 App 已损坏或会损坏电脑，请停止安装。这个试用包未获 Apple Developer ID 签名或公证。
+**现在可以完整体验：** DIY 3D、照片本地抠图与修整、命名保存、`.cornerpet` 导出、Web → macOS 交接，以及桌宠的基础互动、睡眠和提醒。桌面安装包已提供下载。
 
-**不填 API Key 本地运行：** 按下方命令启动 Web，选 **DIY**，或选 **照片 → 保留它** 做本地抠图。选 **照片 → 捏成桌角生物** 时，页面默认使用预置 Demo，并明确提示结果并非根据照片生成。
+当前照片风格化的预置 Demo 与上传照片无关；Seedream 接口已接入，但真实照片的生成效果仍待验证，配置 Key 也不等于保证调用成功。任意照片转可旋转 3D 模型尚未实现。桌面版目前面向 Apple Silicon Mac，使用临时签名，未做 Developer ID 签名、公证或 Intel Mac 验收。
 
-**使用自己的 API Key：** 在仓库根目录把 `.env.example` 复制为 `.env`，填写自己的 `ARK_API_KEY`，重启 `npm run dev` 并刷新网页。进入 **照片 → 捏成桌角生物**，上传照片，点“创建我的桌角生物”：有 Key 会自动尝试真实生成；没有 Key 会在点击后提示当前使用预置示例。页面不要求选择 Demo 或真实模式。这里只检测到服务端是否配置了 Key，不能保证 Key 有效或生成质量；调用可能产生费用，真实生成失败时可以主动改用预置示例。Key 不填在网页里，也不会发送给浏览器。
+## Try it
 
-也可以在同一台 Mac 用 `npm run desktop` 启动 Electron 开发版体验桌面交接。
+**[打开在线体验](https://cornerpet-companion.netlify.app/)**，先捏一只角色，或上传照片选择「保留它」。基础体验不需要账号和 API Key。
 
-## 10. Run locally
+创建完成后点 **「带它去桌面」**。连接成功，小伙伴会直接出现在桌角；没连上时，页面会说明原因并给出安装入口：
 
-Web 需要 Node.js 22.12+ 和 npm；Electron 桌面端需要 macOS。
+1. 下载 [macOS 安装包](https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg)（Apple Silicon，约 128 MB）。
+2. 打开 DMG，把 CornerPet 拖入「应用程序」，再打开 App 一次。
+3. 回到原网页重试「带它去桌面」，按浏览器提示允许打开 App 和连接本机。
+4. 看着同名、同造型的小伙伴来到桌角，点一点，和它打个招呼。
+
+页面里的「导出角色文件（.cornerpet）」用于留存和导入角色；安装桌面 App 请下载上面的 DMG。
+
+首次打开若提示无法验证开发者，确认下载来源可信后，可在「系统设置 → 隐私与安全性」选择「仍要打开」。若提示 App 已损坏或会损坏电脑，请停止安装。
+
+## Run locally
+
+需要 Node.js 22.12+ 和 npm；桌面版在 macOS 上运行。
 
 ```sh
 git clone https://github.com/ask6688/cornerpet.git
 cd cornerpet
 npm ci
 npm run dev          # http://127.0.0.1:5173/
-npm test
-npm run build
-npm run desktop      # macOS：构建后启动 Electron 开发版
-npm run dist:mac     # 可选：在 Apple Silicon Mac 本机生成临时签名的 DMG / ZIP
 ```
 
-只有实验真实生成时才需配置密钥：在仓库根目录运行 `cp .env.example .env`，用编辑器打开 `.env`，将 `ARK_API_KEY=` 后填上自己的火山方舟 Key；`ARK_IMAGE_MODEL` 可留空。保存后重启开发服务器。`.env` 已被 Git 忽略；浏览器只读取“是否可用”的布尔状态，读不到 Key。**在线体验站不提供给访客填写 Key 的入口**；要用自己的 Key，请克隆仓库后在本地配置。公开部署需同时部署 `dist/` 与 `netlify/functions/`，在部署平台的服务端环境变量中配置 Key；若模型权限尚未开通，可设置 `CORNERPET_DEMO_ONLY=true` 暂时让站点只体验预置示例。纯静态部署只提供无 Key 的基础体验。自行打包的文件留在已忽略的 `release/`；它们只有临时签名，尚无 Developer ID 签名或公证，也未做 Intel Mac 验收。
+另开一个终端，在项目目录里启动桌面开发版：
 
-## 11. Tech Stack
+```sh
+npm run desktop      # 构建后启动 Electron
+```
 
-React、TypeScript、Three.js / React Three Fiber、Vite、Electron、ONNX Runtime Web；可选的 Netlify Functions + Blobs 与火山方舟 Seedream 用于实验图片生成。
+体验网页一键交接，请先安装上方 DMG，让 macOS 注册 CornerPet 的打开方式。
 
-## 12. Roadmap
+验证与打包：
 
-- 用真实服务和多种授权照片验收 Seedream 输出质量、透明度与表情一致性。
-- 评估 Developer ID 签名、公证与 Intel Mac 适配，减少首次安装阻力。
-- 继续评估透明窗口空白区域点击穿透与照片 3D 化；后者目前没有可交付方案。
+```sh
+npm test
+npm run build
+npm run dist:mac     # Apple Silicon Mac：生成 DMG / ZIP，产物在 release/
+```
+
+### 使用自己的图片生成 API
+
+1. 在仓库根目录运行 `cp .env.example .env`。
+2. 用编辑器打开 `.env`，在 `ARK_API_KEY=` 后填入自己的火山方舟 Key；`ARK_IMAGE_MODEL` 可以留空。
+3. 重启 `npm run dev`，刷新网页，进入「照片 → 捏成桌角生物」，上传照片并点击创建。
+
+服务端配置 Key 后会自动尝试真实生成；如果调用失败，可以主动改用预置示例。调用可能产生服务商费用。`.env` 已被 Git 忽略，浏览器只能读取配置状态，无法读取 Key。
+
+在线体验站不提供给访客填写 Key 的入口；使用自己的 Key 请本地运行，或在自己的部署平台配置服务端环境变量。Netlify 部署需同时包含 `dist/` 和 `netlify/functions/`；在 Netlify 平台的环境变量中设置 `CORNERPET_DEMO_ONLY=true` 可以只开放预置示例。纯静态部署也能运行基础体验。
+
+## Tech Stack
+
+React · TypeScript · Three.js / React Three Fiber · Vite · Electron · ONNX Runtime Web
+
+可选的图片生成服务：Netlify Functions + Blobs · 火山方舟 Seedream
+
+## Roadmap
+
+- 用真实服务和授权照片验证风格化质量、透明背景与表情一致性。
+- 改善 macOS 首次安装体验，评估 Developer ID 签名、公证及更多机型支持。
+- 继续打磨桌面互动，包括透明窗口空白区域的点击穿透。
