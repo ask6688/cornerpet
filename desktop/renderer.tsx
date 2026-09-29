@@ -10,7 +10,7 @@ type Rect = { x: number; y: number; width: number; height: number };
 type Limits = { min: number; max: number };
 type View = { scale: number; offset: { x: number; y: number }; viewport: Rect };
 type Anchor = { x: number; y: number; ax: number };
-type Pinch = { raw: number; start: number; limits: Limits; begun: Promise<boolean>; anchor?: Anchor; body?: Rect; final?: number; settle?: ReturnType<typeof setTimeout> };
+type Pinch = { raw: number; start: number; limits: Limits; begun: Promise<boolean>; anchor?: Anchor; body?: Rect; frame?: Rect; final?: number; settle?: ReturnType<typeof setTimeout> };
 const viewTransform = (view: View) => `translate(${view.offset.x}px, ${view.offset.y}px) scale(${view.scale})`;
 const RESIZE_HINT = '想换个大小？在我身上双指捏一捏，或者右键我～';
 
@@ -62,7 +62,6 @@ function DesktopPet() {
   const pinch = useRef<Pinch | null>(null);
   // A pinch being saved keeps the layout until the window has shrunk back around its fixed point.
   const settling = useRef<Pinch | null>(null);
-  const heldView = useRef<View | null>(null);
   const commitPinch = useRef<() => Promise<void>>(async () => {});
   useEffect(() => { viewScale.current = view.scale; }, [view.scale]);
   useEffect(() => window.cornerpet.onResizeHint(() => {
@@ -78,29 +77,31 @@ function DesktopPet() {
       setResizeNote(text);
       if (linger) noteTimer.current = setTimeout(() => setResizeNote(''), 1200);
     }
-    // Place the pet around the pinch's fixed point from this window's own position, so the first
-    // frame after the window grows or shrinks is already right. No message to the main process.
+    // Place the pet around the pinch's fixed point inside the grown window. Only the window's size
+    // is trusted to match the frame being drawn (screenX/screenY arrive a frame late), so the
+    // position comes from the plan and nothing moves until the window really has the planned size.
     function layout() {
       const gesture = pinch.current ?? settling.current;
-      if (!gesture?.anchor || !gesture.body || !petLayer.current) return;
-      const { anchor, body } = gesture, scale = gesture.final ?? pinchDisplay(gesture.raw, gesture.limits).scale;
-      const x = anchor.x - (body.x + anchor.ax * body.width) * scale - window.screenX;
-      const y = anchor.y - (body.y + body.height) * scale - window.screenY;
+      if (!gesture?.anchor || !gesture.body || !gesture.frame || !petLayer.current) return;
+      if (Math.abs(innerWidth - gesture.frame.width) > 1) return;
+      const { anchor, body, frame } = gesture, scale = gesture.final ?? pinchDisplay(gesture.raw, gesture.limits).scale;
+      const x = anchor.x - (body.x + anchor.ax * body.width) * scale - frame.x;
+      const y = anchor.y - (body.y + body.height) * scale - frame.y;
       petLayer.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
     }
-    // Hand the layout back to the main process's view once the window has settled.
+    // Once the window has shrunk to the final size, the pet fills it again; then the main
+    // process's view takes the layout back.
     function release(gesture: Pinch) {
-      if (settling.current !== gesture) return;
+      if (settling.current !== gesture || gesture.final === undefined) return;
       settling.current = null;
-      const apply = (value: View) => {
-        heldView.current = null;
+      if (petLayer.current) petLayer.current.style.transform = `translate(0px, 0px) scale(${gesture.final})`;
+      window.cornerpet.getView().then(value => {
+        if (pinch.current || settling.current) return;
         if (petLayer.current) petLayer.current.style.transform = viewTransform(value);
         setView(value);
-      };
-      if (heldView.current) apply(heldView.current);
-      else window.cornerpet.getView().then(apply).catch(() => {});
+      }).catch(() => {});
     }
-    const settled = (gesture: Pinch) => gesture.final !== undefined && Math.abs(innerWidth - DESKTOP_SIZE.width * gesture.final) <= 1;
+    const settled = (gesture: Pinch) => gesture.final !== undefined && Math.abs(innerWidth - Math.round(DESKTOP_SIZE.width * gesture.final)) <= 1;
     function onResize() {
       layout();
       if (settling.current && settled(settling.current)) release(settling.current);
@@ -113,11 +114,13 @@ function DesktopPet() {
       if (!(await gesture.begun)) {
         // A drag owned the window, so nothing grew and nothing is saved.
         show('');
-        release(gesture);
+        settling.current = null;
         return;
       }
+      // Known before the window shrinks, so the frame after it is already laid out.
+      gesture.final = settleScale(gesture.raw, gesture.limits);
       try {
-        gesture.final = await window.cornerpet.resizeCommit(settleScale(gesture.raw, gesture.limits));
+        gesture.final = await window.cornerpet.resizeCommit(gesture.final);
         show(resizeLabel(pinchDisplay(gesture.final, gesture.limits)), true);
       } catch {
         gesture.final = gesture.start;
@@ -142,7 +145,9 @@ function DesktopPet() {
           started.anchor = reply.anchor;
           started.body = reply.footprint;
           started.limits = reply.limits;
+          started.frame = reply.frame;
           started.raw = Math.min(reply.limits.max, Math.max(reply.limits.min, started.raw));
+          window.cornerpet.resizeExpand();
           layout();
           return true;
         }).catch(() => false);
@@ -161,8 +166,8 @@ function DesktopPet() {
     return () => { removeEventListener('wheel', onWheel); removeEventListener('resize', onResize); clearTimeout(noteTimer.current); clearTimeout(hintTimer.current); };
   }, []);
   useEffect(() => {
-    // While a pinch owns the layout, the main process's view waits until the window has settled.
-    const receive = (value: View) => { if (pinch.current || settling.current) heldView.current = value; else setView(value); };
+    // While a pinch owns the layout, the main process's view is ignored; release() fetches it anew.
+    const receive = (value: View) => { if (!pinch.current && !settling.current) setView(value); };
     const unsubscribe = window.cornerpet.onView(receive);
     window.cornerpet.getView().then(receive).catch(() => setError('位置暂时没能准备好'));
     window.cornerpet.getConfig().then(value => {

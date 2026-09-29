@@ -427,6 +427,8 @@ ipcMain.handle('pet:scale-options', event => {
 });
 // A pinch grows the window once to the largest size it may reach. The page then scales the pet
 // with CSS around the fixed point, so the native window changes only at the start and the end.
+// The page learns the planned window first and asks for it afterwards: screenX/screenY reach the
+// page a frame after a new size, so it must not have to wait for them.
 ipcMain.handle('pet:resize-begin', event => {
   if (!trusted(event)) throw new Error('Untrusted sender');
   if (drag) return null;
@@ -438,10 +440,17 @@ ipcMain.handle('pet:resize-begin', event => {
     const bounds = visualBounds(), display = screen.getDisplayMatching(bounds), area = displayArea(display);
     const { min, max } = desktopScaleLimits(display.workArea);
     const anchor = resizeAnchor(bounds, footprint, renderScale, area);
-    pinch = { anchor, limits: { min, max: Math.min(max, Math.max(renderScale, pinchRoom(anchor, footprint, area))) } };
-    placeWindow(anchoredPetBounds(anchor, footprint, pinch.limits.max));
+    const limits = { min, max: Math.min(max, Math.max(renderScale, pinchRoom(anchor, footprint, area))) };
+    const planned = anchoredPetBounds(anchor, footprint, limits.max);
+    // macOS keeps windows below the menu bar; plan for that so the page knows the real position.
+    pinch = { anchor, limits, frame: { ...planned, y: Math.max(planned.y, area.y) }, expanded: false };
   }
-  return { anchor: pinch.anchor, footprint, limits: pinch.limits };
+  return { anchor: pinch.anchor, footprint, limits: pinch.limits, frame: pinch.frame };
+});
+ipcMain.on('pet:resize-expand', event => {
+  if (!trusted(event) || !pinch || pinch.expanded) return;
+  pinch.expanded = true;
+  placeWindow(pinch.frame);
 });
 ipcMain.handle('pet:resize-commit', (event, scale) => {
   if (!trusted(event)) throw new Error('Untrusted sender');

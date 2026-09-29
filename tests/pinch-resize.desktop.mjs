@@ -67,7 +67,8 @@ try {
   await app.evaluate(({ BrowserWindow, screen }) => {
     const pet = BrowserWindow.getAllWindows()[0], setBounds = pet.setBounds.bind(pet), cursor = screen.getCursorScreenPoint.bind(screen);
     globalThis.nativeResizes = 0;
-    pet.setBounds = (...args) => { globalThis.nativeResizes++; return setBounds(...args); };
+    globalThis.boundsLog = [];
+    pet.setBounds = (...args) => { globalThis.nativeResizes++; globalThis.boundsLog.push({ t: Date.now(), ...args[0] }); return setBounds(...args); };
     globalThis.cursorShift = 0;
     screen.getCursorScreenPoint = () => { const point = cursor(); return { x: point.x + globalThis.cursorShift, y: point.y }; };
   });
@@ -156,6 +157,31 @@ try {
   assert.ok(await petWidth() > Math.round(280 * 1.66), 'the next pinch previews live after a tap');
   await saved(1.95);
 
+  // Pinch, stop, pinch again. On every frame, including the first ones after the window grows
+  // (whose new position the page learns a frame late), the pet's fixed point stays put on screen.
+  await page.waitForTimeout(700);
+  const rest = await petBounds(), fixed = resizeAnchor(rest, body, 1.95, area);
+  await app.evaluate(() => { globalThis.boundsLog = []; });
+  await page.evaluate(() => {
+    const pet = document.querySelector('.desktop-pet');
+    window.frameLog = [];
+    const tick = () => { window.frameLog.push({ t: Date.now(), w: innerWidth, tf: pet.style.transform }); if (window.frameLog.length < 900) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  });
+  await pinch(Array(4).fill(8));
+  await saved(1.42);
+  await page.waitForTimeout(700);
+  await pinch(Array(4).fill(8));
+  await saved(1);
+  await page.waitForTimeout(700);
+  const placed = [{ t: 0, ...rest }, ...await app.evaluate(() => globalThis.boundsLog)];
+  for (const frame of await page.evaluate(() => window.frameLog)) {
+    const bounds = placed.filter(entry => entry.t <= frame.t && Math.abs(entry.width - frame.w) <= 1).at(-1);
+    const [, x, y, scale] = frame.tf.match(/translate\(([-\d.e]+)px, ([-\d.e]+)px\) scale\(([-\d.e]+)\)/).map(Number);
+    const pointX = bounds.x + x + (body.x + fixed.ax * body.width) * scale, pointY = bounds.y + y + (body.y + body.height) * scale;
+    assert.ok(Math.abs(pointX - fixed.x) <= 2 && Math.abs(pointY - fixed.y) <= 2, `a frame drew the fixed point at (${pointX.toFixed(1)}, ${pointY.toFixed(1)}) instead of (${fixed.x.toFixed(1)}, ${fixed.y.toFixed(1)}): ${JSON.stringify(frame)}`);
+  }
+
   // Real drags show the hint on the first three, even though this pet has been resized many
   // times; the fourth drag is quiet.
   await until(async () => (await page.locator('.pet-bubble').textContent()) === '', 'a quiet bubble');
@@ -181,8 +207,8 @@ try {
   try {
     await pinch(Array(10).fill(-8));
     await says('大小暂时没能记住，再捏一下试试');
-    assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), 1.95);
-    await until(async () => (await page.evaluate(() => window.cornerpet.getView())).scale === 1.95, 'view back at 1.95');
+    assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), 1);
+    await until(async () => (await page.evaluate(() => window.cornerpet.getView())).scale === 1, 'view back at 1');
   } finally { await chmod(data, 0o700); }
   console.log('pinch resize desktop checks passed');
 } finally {
