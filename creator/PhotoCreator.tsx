@@ -31,6 +31,8 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
   const [mode, setMode] = useState<'original' | 'generated'>('generated');
   const [style, setStyle] = useState<GenerationStyle>('mochi');
   const [provider, setProvider] = useState<GenerationProvider>('demo');
+  const [apiConfigured, setApiConfigured] = useState(false);
+  const [apiChecked, setApiChecked] = useState(false);
   const [subject, setSubject] = useState<'portrait' | 'object'>('portrait');
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
@@ -39,9 +41,24 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
   const [cutout, setCutout] = useState<Blob | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const request = useRef<AbortController | null>(null);
+  const providerChosen = useRef(false);
   useEffect(() => () => request.current?.abort(), []);
   useEffect(() => () => { if (source) URL.revokeObjectURL(source); }, [source]);
   useEffect(() => { onBusyChange(busy || !!cutout); }, [busy, cutout, onBusyChange]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/generation-capability', { signal: controller.signal, cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(status => {
+        if (controller.signal.aborted) return;
+        const configured = status?.configured === true;
+        setApiConfigured(configured);
+        if (configured && !providerChosen.current) setProvider('doubao');
+      })
+      .catch(() => {})
+      .finally(() => { if (!controller.signal.aborted) setApiChecked(true); });
+    return () => controller.abort();
+  }, []);
   function reset() { setResult(null); setError(''); }
   function begin() {
     request.current?.abort();
@@ -128,14 +145,14 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
         {mode === 'original' ? <div className="subject-picker"><span>照片里是</span><button disabled={busy} aria-pressed={subject === 'portrait'} onClick={() => { setSubject('portrait'); reset(); }}>人物</button><button disabled={busy} aria-pressed={subject === 'object'} onClick={() => { setSubject('object'); reset(); }}>宠物 · 小物</button></div>
           : <div className="generation-options">
             <div className="style-picker" role="group" aria-label="生成风格">{GENERATION_STYLES.map(item => <button disabled={busy} key={item.value} className={style === item.value ? 'selected' : ''} aria-pressed={style === item.value} onClick={() => { setStyle(item.value); reset(); }}><img src={item.preview} alt={`${item.label}预置示例`} /><span><b>{item.label}</b><small>{item.note}</small></span></button>)}</div>
-            <div className="generation-provider" role="group" aria-label="生成方式"><button disabled={busy} aria-pressed={provider === 'demo'} onClick={() => { setProvider('demo'); reset(); }}>先体验 Demo</button><button disabled={busy} aria-pressed={provider === 'doubao'} onClick={() => { setProvider('doubao'); reset(); }}>用照片真实生成</button></div>
+            <div className="generation-provider" role="group" aria-label="生成方式"><button disabled={busy} aria-pressed={provider === 'demo'} onClick={() => { providerChosen.current = true; setProvider('demo'); reset(); }}>先体验 Demo</button><button disabled={busy || !apiConfigured} aria-pressed={provider === 'doubao'} onClick={() => { providerChosen.current = true; setProvider('doubao'); reset(); }}>用照片真实生成</button></div>
             {provider === 'doubao' && <div className="subject-picker"><span>照片里是</span><button disabled={busy} aria-pressed={subject === 'portrait'} onClick={() => { setSubject('portrait'); reset(); }}>人物</button><button disabled={busy} aria-pressed={subject === 'object'} onClick={() => { setSubject('object'); reset(); }}>宠物 · 小物</button></div>}
-            <p className="generation-note">{provider === 'demo' ? 'Demo 使用预置小伙伴演示后续流程，不会读取照片特征，照片也不会上传' : '点击「捏出这位小朋友」后，网页先抠出照片主体，再发送到豆包图片服务；服务不可用时，可改用 Demo 继续体验'}</p>
+            <p className="generation-note">{!apiChecked ? '正在检查图片生成服务；预置 Demo 仍可体验' : provider === 'demo' ? apiConfigured ? '当前选择预置 Demo，不会读取照片特征；你也可以切换到照片真实生成' : '未配置图片生成 API，当前使用预置 Demo；结果不会根据照片生成，照片也不会上传' : '已检测到服务端配置；点击后先在浏览器抠出主体，再发送到豆包图片服务。真实效果仍待验证，失败时可改用 Demo'}</p>
           </div>}
         {error && <div className="photo-error" role="alert">{error}{mode === 'generated' && provider === 'doubao' && !busy && <button onClick={() => { setProvider('demo'); void create('demo'); }}>先用 Demo 小伙伴继续 →</button>}</div>}
         {result && <p className="generation-result-note" role="status">{result.generationProvider === 'demo' ? 'Demo 结果 · 这是预置小伙伴，并非根据你的照片生成，可以修整、命名，再带到桌面' : ['doubao', 'openai'].includes(result.generationProvider ?? '') ? '已根据照片生成，可以擦掉多余的部分，再给它起个名字' : '透明底已经准备好了，可以继续修整，再给它起个名字'}</p>}
         {result ? <><button className="bring-button" disabled={busy} onClick={() => onReady(result)}>给它起个名字 <span>→</span></button><div className="photo-secondary"><button disabled={busy} onClick={() => void edit()}>擦掉多余的部分</button><button disabled={busy} onClick={reset}>重新制作</button></div></>
-          : <button className="bring-button" disabled={!photo || busy} onClick={() => void create()}>{busy ? '再等它一小会…' : mode === 'original' ? '把它留下来' : provider === 'demo' ? '请 Demo 小伙伴出场' : '捏出这位小朋友'} <span>→</span></button>}
+          : <button className="bring-button" disabled={!photo || busy} onClick={() => void create()}>{busy ? '再等它一小会…' : mode === 'original' ? '把它留下来' : '创建我的桌角生物'} <span>→</span></button>}
       </section>
     </section>
     {cutout && <ManualEraser image={cutout} busy={busy} onCancel={() => { request.current?.abort(); setBusy(false); setCutout(null); }} onApply={blob => void applyErase(blob)} />}

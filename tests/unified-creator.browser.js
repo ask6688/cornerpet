@@ -7,6 +7,7 @@ async page => {
   const atlas = await (await page.request.get('http://127.0.0.1:5173/tests/samples/expression-atlas.png')).body();
   let generatedCalls = 0;
   let statusChecks = 0;
+  await page.route('**/api/generation-capability', route => route.fulfill({ json: { configured: true } }));
   await page.route('**/api/generate-pet', async route => {
     const input = route.request().postDataJSON();
     assert(input.style === 'mochi' && input.image.startsWith('data:image/png;base64,'), 'bad generation request');
@@ -56,7 +57,7 @@ async page => {
       } else {
         await page.getByRole('button', { name: '用照片真实生成', exact: true }).click();
         await page.getByRole('button', { name: '宠物 · 小物', exact: true }).click();
-        await page.getByRole('button', { name: /捏出这位小朋友/ }).click();
+        await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
       }
       await page.locator('.image-pet[data-motion="showcase"]').waitFor();
       assert(await page.locator('.pet-speech').count() === 0, `${mode} showcase displayed speech`);
@@ -123,5 +124,5 @@ async page => {
     }
     assert(generatedCalls === 1, 'expected exactly one mocked Doubao request');
     return reports;
-  } finally { await page.unroute('**/api/generate-pet'); await page.unroute('**/api/pet-generation*'); }
+  } finally { await page.unroute('**/api/generation-capability'); await page.unroute('**/api/generate-pet'); await page.unroute('**/api/pet-generation*'); }
 }

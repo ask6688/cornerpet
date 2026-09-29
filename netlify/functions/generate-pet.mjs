@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { validateGenerationInput, publicGenerationError } from '../../server/generate-pet.mjs';
+import { validateGenerationInput, publicGenerationError, generationConfigured } from '../../server/generate-pet.mjs';
 import { JOB_TTL_MS, deleteJob, jobKey, jobStore, json } from '../../server/generation-job.mjs';
 
 export async function startPetGeneration(request, options = {}) {
   const apiKey = options.apiKey ?? process.env.ARK_API_KEY;
-  if (!apiKey) return json({ error: '图片生成服务尚未配置。请先在服务端设置 ARK_API_KEY。' }, 503);
+  if (!generationConfigured(apiKey)) return json({ error: '图片生成服务尚未配置。请先在服务端设置 ARK_API_KEY。' }, 503);
   let id;
   const store = options.store ?? jobStore();
   try {

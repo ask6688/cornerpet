@@ -31,7 +31,7 @@ async page => {
   await page.getByRole('button', { name: /保留它/ }).click();
   await measure('photo-original');
   await page.getByRole('button', { name: /捏成桌角生物/ }).click();
-  await page.getByRole('button', { name: /请 Demo 小伙伴出场/ }).click();
+  await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
   await page.getByRole('button', { name: /给它起个名字/ }).waitFor();
   await measure('photo-result');
   await page.getByRole('button', { name: '擦掉多余的部分', exact: true }).click();

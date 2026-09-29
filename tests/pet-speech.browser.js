@@ -30,7 +30,7 @@ async page => {
   await page.getByRole('button', { name: '领一只小东西回家', exact: true }).click();
   await page.getByRole('button', { name: '把生活里的它带回来', exact: true }).click();
   await page.getByLabel('上传照片', { exact: true }).setInputFiles('tests/samples/pet-cat.png');
-  await page.getByRole('button', { name: /请 Demo 小伙伴出场/ }).click();
+  await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
   await page.locator('.image-pet[data-motion="showcase"]').waitFor();
   assert(await page.locator('.pet-speech').count() === 0, 'automatic showcase displayed a bubble');
   await page.getByRole('button', { name: '开心', exact: true }).click();

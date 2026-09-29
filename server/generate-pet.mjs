@@ -32,10 +32,26 @@ export function publicGenerationError(reason) {
   return reason instanceof Error && Number(reason.status) >= 400 && Number(reason.status) < 600 ? reason.message : '图片生成暂时失败，请稍后重试';
 }
 
+export function generationConfigured(apiKey = process.env.ARK_API_KEY) {
+  return typeof apiKey === 'string' && !!apiKey.trim() && apiKey !== 'undefined';
+}
+
+export function handleGenerationCapability(request, response, next) {
+  if ((request.url || '').split('?')[0] !== '/api/generation-capability') return next?.();
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
+  response.setHeader('Cache-Control', 'no-store');
+  if (request.method !== 'GET') {
+    response.statusCode = 405;
+    response.end(JSON.stringify({ error: '只支持 GET 请求' }));
+    return;
+  }
+  response.end(JSON.stringify({ configured: generationConfigured() }));
+}
+
 export async function generatePet(input, options = {}) {
   const { style } = validateGenerationInput(input);
   const apiKey = options.apiKey ?? process.env.ARK_API_KEY;
-  if (!apiKey || apiKey === 'undefined') throw failure('图片生成服务尚未配置，请在服务端设置 ARK_API_KEY', 503);
+  if (!generationConfigured(apiKey)) throw failure('图片生成服务尚未配置，请在服务端设置 ARK_API_KEY', 503);
   const model = options.model ?? process.env.ARK_IMAGE_MODEL ?? 'doubao-seedream-5-0-flash-260915';
 
   async function edit(image, prompt, size, errorMessage) {

@@ -18,7 +18,7 @@ async page => {
       await page.waitForFunction(() => [...document.querySelectorAll('.style-picker img')].every(image => image.complete && image.naturalWidth > 0));
       assert(await page.getByRole('button', { name: '先体验 Demo', exact: true }).getAttribute('aria-pressed') === 'true', 'Demo is not the safe default');
       await page.getByRole('button', { name: new RegExp(style === 'mochi' ? '糯米小团预置示例' : '口袋毛绒预置示例') }).click();
-      await page.getByRole('button', { name: /请 Demo 小伙伴出场/ }).click();
+      await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
       await page.getByRole('button', { name: /给它起个名字/ }).waitFor();
       assert(apiCalls === 0, 'Demo called the generation API');
       assert(await page.locator('.generation-result-note').innerText().then(text => text.includes('并非根据你的照片生成')), 'Demo provenance missing');
@@ -102,6 +102,7 @@ async page => {
       assert(JSON.stringify(await stored()) === JSON.stringify(pet), 'refresh changed Demo identity or asset');
       reports.push(`${style}: bundled thumbnail → upload → Demo (zero API calls) → transparent preview → naming → local restore passed`);
     }
+    await page.route('**/api/generation-capability', route => route.fulfill({ json: { configured: true } }));
     await page.goto('http://127.0.0.1:5173/');
     await page.locator('.studio-welcome').waitFor();
     await page.getByRole('button', { name: '领一只小东西回家', exact: true }).click({ timeout: 25000 });
@@ -109,7 +110,7 @@ async page => {
     await page.getByLabel('上传照片', { exact: true }).setInputFiles('tests/samples/pet-cat.png');
     await page.getByAltText('你上传的原始照片', { exact: true }).waitFor();
     await page.getByRole('button', { name: '用照片真实生成', exact: true }).click();
-    await page.getByRole('button', { name: /捏出这位小朋友/ }).click();
+    await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
     await page.getByRole('alert').waitFor();
     assert(apiCalls === 1, 'real mode did not attempt the adapter');
     await page.getByRole('button', { name: '先用 Demo 小伙伴继续 →', exact: true }).click();
@@ -120,5 +121,5 @@ async page => {
     assert(await page.locator('.generation-result-note').innerText().then(text => text.includes('Demo 结果')), 'fallback hides Demo provenance');
     reports.push('Real service unavailable → explicit Demo fallback → usable result passed; no paid service called');
     return reports;
-  } finally { await page.unroute('**/api/generate-pet'); }
+  } finally { await page.unroute('**/api/generation-capability'); await page.unroute('**/api/generate-pet'); }
 }

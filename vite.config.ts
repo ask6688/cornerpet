@@ -1,11 +1,11 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import { handleGeneratePet } from './server/generate-pet.mjs';
+import { handleGeneratePet, handleGenerationCapability } from './server/generate-pet.mjs';
 
 const generationApi = () => ({
   name: 'cornerpet-generation-api',
-  configureServer(server: { middlewares: { use: (handler: typeof handleGeneratePet) => void } }) { server.middlewares.use(handleGeneratePet); },
-  configurePreviewServer(server: { middlewares: { use: (handler: typeof handleGeneratePet) => void } }) { server.middlewares.use(handleGeneratePet); },
+  configureServer(server: { middlewares: { use: (handler: typeof handleGeneratePet) => void } }) { server.middlewares.use(handleGenerationCapability); server.middlewares.use(handleGeneratePet); },
+  configurePreviewServer(server: { middlewares: { use: (handler: typeof handleGeneratePet) => void } }) { server.middlewares.use(handleGenerationCapability); server.middlewares.use(handleGeneratePet); },
 });
 
 export default defineConfig(({ mode }) => {

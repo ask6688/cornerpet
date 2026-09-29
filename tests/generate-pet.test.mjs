@@ -1,10 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { generatePet } from '../server/generate-pet.mjs';
+import { generatePet, generationConfigured, handleGenerationCapability } from '../server/generate-pet.mjs';
 
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const atlas = `data:image/png;base64,${readFileSync(new URL('./samples/expression-atlas.png', import.meta.url)).toString('base64')}`;
+
+test('capability exposes only whether the server has a key', () => {
+  assert.equal(generationConfigured(''), false);
+  assert.equal(generationConfigured('test-key'), true);
+  const before = process.env.ARK_API_KEY;
+  process.env.ARK_API_KEY = 'test-secret';
+  try {
+    const headers = {};
+    const response = { setHeader(name, value) { headers[name] = value; }, end(body) { this.body = body; } };
+    handleGenerationCapability({ url: '/api/generation-capability', method: 'GET' }, response);
+    assert.deepEqual(JSON.parse(response.body), { configured: true });
+    assert.equal(headers['Cache-Control'], 'no-store');
+    assert.doesNotMatch(response.body, /test-secret/);
+  } finally {
+    if (before === undefined) delete process.env.ARK_API_KEY;
+    else process.env.ARK_API_KEY = before;
+  }
+});
 
 test('Doubao edits a transparent photo subject, then produces a six-expression sheet', async () => {
   const requests = [];

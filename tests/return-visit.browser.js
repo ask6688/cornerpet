@@ -38,7 +38,7 @@ async page => {
   await page.getByRole('button', { name: '领一只小东西回家', exact: true }).click({ timeout: 25000 });
   await page.getByRole('button', { name: '把生活里的它带回来', exact: true }).click();
   await page.getByLabel('上传照片', { exact: true }).setInputFiles('tests/samples/pet-cat.png');
-  await page.getByRole('button', { name: /请 Demo 小伙伴出场/ }).click();
+  await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
   await page.getByRole('button', { name: /给它起个名字/ }).waitFor();
   // A real transaction rejection: the old record must survive; no native request is allowed.
   await page.evaluate(() => {

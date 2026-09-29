@@ -4,13 +4,19 @@
 
 用户可以自己捏一只角色，或把喜欢的照片变成桌角伙伴，再把它带到 macOS 桌面陪伴自己。CornerPet 探索的是一种安静、低打扰、由用户亲手建立情感连接的桌面陪伴体验。
 
-**为什么做：** 让电脑工作中的陪伴有存在感，同时尽量不打断用户。
+每天打开电脑，桌角总是空着。开场短片讲的是：那里慢慢出现一只小生命；它会发呆、睡觉，偶尔回应你，陪伴从此有了一个不打扰人的位置。用户先亲手创造它，再决定如何让它留下来。
 
 **核心路径：** DIY 3D 或照片本地抠图 → 预览、命名、保存 → 带到 macOS 桌角互动。
 
 ## 1. Preview
 
-> 下图均来自本仓库版本的本地实际运行。当前尚无在线 Demo 或可下载安装包。
+**先看 21 秒开场故事：** [播放原始短片](docs/assets/story-opening.mp4)。下方动图取自同一段实际录屏。
+
+[![CornerPet 开场故事：空桌角出现一只安静陪伴的小生命](docs/assets/story-opening.gif)](docs/assets/story-opening.mp4)
+
+画面里的小团从一个空桌角出现，先好奇地张望，再短暂入睡，最后留在角落陪你。这是产品想交付的情绪和节奏：有存在感，也允许用户继续专注自己的事。
+
+### 从创建到桌角
 
 ![DIY 3D 工作台](docs/assets/diy-studio.png)
 
@@ -22,17 +28,31 @@ DIY 工作台提供六种 3D 基础造型，下面是创建页中的实际选择
 
 ![六种 DIY 3D 基础造型](docs/assets/diy-shapes.png)
 
-照片路径的这组对比来自同一张**合成测试猫照片**，展示浏览器本地抠图的实际结果。毛发边缘仍可在产品中手动修整；这一步没有调用 AI 风格化。
+| 糯米团 | 草莓团 | 小吐司 |
+| --- | --- | --- |
+| ![糯米团 3D 造型](docs/assets/models/mochi.png) | ![草莓团 3D 造型](docs/assets/models/strawberry.png) | ![小吐司 3D 造型](docs/assets/models/toast.png) |
+| 云朵 | 布丁 | 小蘑菇 |
+| ![云朵 3D 造型](docs/assets/models/cloud.png) | ![布丁 3D 造型](docs/assets/models/pudding.png) | ![小蘑菇 3D 造型](docs/assets/models/mushroom.png) |
 
-| 原始照片 | 本地抠图后 |
-| --- | --- |
-| ![合成测试猫原图](docs/assets/cat-original.png) | ![本地抠图结果](docs/assets/cat-cutout.png) |
+照片路径的这组对比以同一张**合成测试猫照片**为起点。本地抠图是当前产品的实际结果，毛发边缘可手动修整；最右侧是为说明未来风格方向单独制作的**视觉示意**，不是 CornerPet API 或当前 Demo 根据该照片生成的结果。
 
-照片风格化的当前预览是两张**固定的原创 Demo 角色**，与上面的猫照片无生成关系。预览中的表情按钮可演示开心、困困、发呆、害羞、惊讶等反馈；真实照片经 Seedream 生成对应表情的效果仍待验证。
+| 原始照片 | 本地抠图：真实产品结果 | 风格化：独立视觉示意 |
+| --- | --- | --- |
+| ![合成测试猫原图](docs/assets/cat-original.png) | ![同一照片的本地抠图结果](docs/assets/cat-cutout.png) | ![参考同一合成猫制作的风格化概念图，非产品 API 结果](docs/assets/cat-stylized-illustration.png) |
+
+照片风格化的当前预览是两张**固定的原创 Demo 角色**，与上面的猫照片无生成关系。未配置图片 API 时会默认展示这些示例，并在界面标明来源。预览中的表情按钮可演示开心、困困、发呆、害羞、惊讶等反馈；真实照片经 Seedream 生成对应表情的效果仍待验证。
 
 | 预置 Demo 角色 1 | 预置 Demo 角色 2 |
 | --- | --- |
 | ![麻薯芽预置角色](public/examples/mochi-sprout.png) | ![绒云预置角色](public/examples/plush-cloud.png) |
+
+下面五张是**同一个预置 Demo 角色在当前产品里点击表情按钮后的实际截图**，展示桌宠如何回应用户；它们不代表上传照片已经生成了五种表情。
+
+| 开心 | 困困 | 发呆 |
+| --- | --- | --- |
+| ![Demo 小伙伴开心表情](docs/assets/expressions/happy.png) | ![Demo 小伙伴困困表情](docs/assets/expressions/sleepy.png) | ![Demo 小伙伴发呆表情](docs/assets/expressions/daydream.png) |
+| 害羞 | 惊讶 | |
+| ![Demo 小伙伴害羞表情](docs/assets/expressions/shy.png) | ![Demo 小伙伴惊讶表情](docs/assets/expressions/surprised.png) | |
 
 桌面宠物的真实 macOS 场景截图尚待补充；不使用合成桌面效果图代替实机截图。
 
@@ -79,7 +99,7 @@ DIY 工作台提供六种 3D 基础造型，下面是创建页中的实际选择
 | --- | --- |
 | 照片去背景 | 浏览器 Worker 运行 MODNet / U²-NetP；保留原图路径不调用云端图片服务。 |
 | 风格化 Demo | 使用本仓库内的两张原创预置 PNG，上传照片不会影响 Demo 结果。 |
-| Seedream 风格化 | 已有服务端接口与异步任务代码，需部署者自己的火山方舟 `ARK_API_KEY`；真实照片效果仍待验收。选择此模式时，浏览器先抠图，再把主体发送至服务端和豆包。 |
+| Seedream 风格化 | 已有服务端接口与异步任务代码，需部署者自己的火山方舟 `ARK_API_KEY`；配置后照片页会默认选中真实生成，但真实照片效果仍待验收。点击生成时，浏览器先抠图，再把主体发送至服务端和豆包。 |
 | 任意照片转可旋转 3D | 未实现。DIY 3D 不等于照片 3D 化。 |
 
 预置 Demo 图与测试猫照片是为此公开候选版重新生成的合成素材，没有参考真实人物肖像。图像生成参与了素材制作；这里不以素材生成证明线上 AI API 已通过验收。
@@ -93,27 +113,34 @@ DIY 工作台提供六种 3D 基础造型，下面是创建页中的实际选择
 | **Experimental / 待验证** | Seedream 真实 AI 风格化：接口已接入，仍需用真实服务与照片验证结果和部署环境。 |
 | **未实现** | 任意照片 → 可旋转 3D 模型。 |
 
-目前只支持 macOS 桌面端。公开候选版没有签名／公证安装包，也未完成 Intel Mac 验收。
+桌面端当前面向 Apple Silicon macOS；可在本机生成未签名 DMG / ZIP，尚无公开下载，也未完成公证或 Intel Mac 验收。
 
 ## 9. Try it
 
-按照下方命令启动 Web 后，直接选 **DIY** 或 **照片 → 先体验 Demo**；无需 API Key。照片 **“保留它”** 模式也无需 Key。要体验桌面交接，需要在同一台 Mac 启动 Electron 开发版，浏览器按提示允许打开应用与访问本机连接。
+**[在线体验 Web 版](https://cornerpet-companion-test.netlify.app/)**：可以直接捏 3D 角色、上传照片做本地抠图，并体验命名、保存与预置风格化角色。在线页面属于测试站；若服务端没有配置图片 API，照片风格化会明确标为预置 Demo，结果与上传照片无关。基础体验无需账号和 Key。
 
-真实 Seedream 模式仅供配置了自己服务端 Key 的开发者实验；托管页面没有让访客填写 Key 的入口，调用可能产生费用。
+**不填 API Key 本地运行：** 按下方命令启动 Web，选 **DIY**，或选 **照片 → 保留它** 做本地抠图。选 **照片 → 捏成桌角生物** 时，页面默认使用预置 Demo，并明确提示结果并非根据照片生成。
+
+**使用自己的 API Key：** 在仓库根目录把 `.env.example` 复制为 `.env`，填写自己的 `ARK_API_KEY`，重启 `npm run dev` 并刷新网页。进入 **照片 → 捏成桌角生物** 后，“用照片真实生成”会自动选中；上传照片，再点“捏出这位小朋友”。这里只检测到服务端是否配置了 Key，不能保证 Key 有效或生成质量；调用可能产生费用，失败时可以手动改用 Demo。Key 不填在网页里，也不会发送给浏览器。
+
+要体验桌面交接，需要在同一台 Mac 启动 Electron 开发版，浏览器按提示允许打开应用与访问本机连接。
 
 ## 10. Run locally
 
-需要 macOS、Node.js 22.12+ 和 npm。
+Web 需要 Node.js 22.12+ 和 npm；Electron 桌面端需要 macOS。
 
 ```sh
+git clone https://github.com/ask6688/cornerpet.git
+cd cornerpet
 npm ci
 npm run dev          # http://127.0.0.1:5173/
 npm test
 npm run build
 npm run desktop      # macOS：构建后启动 Electron 开发版
+npm run dist:mac     # 可选：在 Apple Silicon Mac 本机生成未签名 DMG / ZIP
 ```
 
-只有实验真实生成时才需配置密钥：复制 `.env.example` 为 `.env`，在本机填写 `ARK_API_KEY`，可选填写 `ARK_IMAGE_MODEL`，然后重启开发服务器。`.env` 不提交；浏览器代码不读取密钥。公开部署需同时部署 `dist/` 与 `netlify/functions/`，在部署平台的服务端环境变量中配置 Key；纯静态部署只提供无 Key 的基础体验。
+只有实验真实生成时才需配置密钥：在仓库根目录运行 `cp .env.example .env`，用编辑器打开 `.env`，将 `ARK_API_KEY=` 后填上自己的火山方舟 Key；`ARK_IMAGE_MODEL` 可留空。保存后重启开发服务器。`.env` 已被 Git 忽略；浏览器只读取“是否配置”的布尔状态，读不到 Key。**在线体验站不提供给访客填写 Key 的入口**；要用自己的 Key，请克隆仓库后在本地配置。公开部署需同时部署 `dist/` 与 `netlify/functions/`，在部署平台的服务端环境变量中配置 Key；纯静态部署只提供无 Key 的基础体验。生成的安装文件留在已忽略的 `release/`，目前尚未提供公开下载；它们未签名、未公证，也未做 Intel Mac 验收。
 
 ## 11. Tech Stack
 
@@ -122,5 +149,5 @@ React、TypeScript、Three.js / React Three Fiber、Vite、Electron、ONNX Runti
 ## 12. Roadmap
 
 - 用真实服务和多种授权照片验收 Seedream 输出质量、透明度与表情一致性。
-- 完成与同一源码版本对应的 macOS 安装包验收，并补充签名／公证后的分发体验。
+- 决定未签名的 Apple Silicon 安装包如何对外提供，再评估签名／公证与 Intel Mac 适配。
 - 继续评估透明窗口空白区域点击穿透与照片 3D 化；后者目前没有可交付方案。
