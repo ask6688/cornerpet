@@ -8,6 +8,11 @@ declare global {
       onState(callback: (state: PetStateSnapshot) => void): () => void;
       getConfig(): Promise<typeof import('../shared/pet-config.mjs').PET>;
       setScale(scale: number): Promise<number>;
+      resizePreview(scale: number): Promise<number>;
+      resizeCommit(scale: number): Promise<number>;
+      resizeCancel(): Promise<number>;
+      focusPet(): void;
+      onResizeHint(callback: () => void): () => void;
       previewScale(scale: number): Promise<number>;
       getScaleOptions(): Promise<{ scale: number; min: number; max: number }>;
       closeScale(): void;

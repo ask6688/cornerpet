@@ -5,6 +5,7 @@ import { PET, parseLaunchUrl } from '../shared/pet-config.mjs';
 import { DESKTOP_SIZE, DEFAULT_FOOTPRINT, validFootprint, containPet, desktopDragPosition, resizedPetBounds, visibleViewport, desktopScaleLimits } from './layout.mjs';
 import { createHandoffServer, parseDesktopPackage } from './handoff.mjs';
 import { createPetStorage, readPetFile } from './pet-storage.mjs';
+import { DEFAULT_HINT_STATE, createResizeHintStore, learnedResizeHint, nextResizeHint } from './resize-hint.mjs';
 
 import { createPetStateMachine } from '../shared/pet-state.mjs';
 
@@ -27,6 +28,8 @@ let petWindow;
 let sizeWindow;
 let renderScale = 1;
 let previewScale;
+// Who drives previewScale: the custom-size panel or a trackpad pinch.
+let previewOwner;
 let tray;
 let footprint = DEFAULT_FOOTPRINT;
 let contentOffset = { x: 0, y: 0 };
@@ -37,6 +40,8 @@ let pendingFile;
 let importRequest = 0;
 const handoff = createHandoffServer({ adopt: adoptDesktopPackage });
 const petStorage = createPetStorage(app.getPath('userData'));
+const hintStore = createResizeHintStore(app.getPath('userData'));
+let hintState = DEFAULT_HINT_STATE;
 
 function readDesktopPackage(text) {
   return parseDesktopPackage(text, bytes => {
@@ -151,6 +156,7 @@ else {
     behaviorTimer = setInterval(sampleBehavior, 1000);
     screen.on('display-removed', keepOnDisplay);
     screen.on('display-metrics-changed', keepOnDisplay);
+    hintState = await hintStore.read();
     if (!pendingFile && importRequest === 0) {
       try {
         const saved = readDesktopPackage(await petStorage.read());
@@ -243,6 +249,7 @@ function updateDrag() {
     petWindow.setSize(Math.round(DESKTOP_SIZE.width * renderScale), Math.round(DESKTOP_SIZE.height * renderScale));
   }
   const next = desktopDragPosition(drag, cursor, displayArea(display), footprint, renderScale);
+  if (next.moved && !drag.moved) offerResizeHint();
   drag.moved ||= next.moved;
   if (drag.moved) placeWindow({ ...petWindow.getBounds(), x: next.x, y: next.y });
 }
@@ -311,6 +318,8 @@ async function setPetScale(scale) {
   if (request !== importRequest) throw new Error('小伙伴已经换了一只，请重新调整');
   launchPet = next;
   previewScale = undefined;
+  previewOwner = undefined;
+  if (!hintState.learned) saveHintState(learnedResizeHint(hintState));
   resizeWindow(renderScale);
   updateTray();
   return scale;
@@ -336,7 +345,10 @@ function showSizeWindow() {
   sizeWindow.once('ready-to-show', () => sizeWindow?.show());
   sizeWindow.on('closed', () => {
     sizeWindow = undefined;
+    // A pinch that closed this panel owns the preview now.
+    if (previewOwner === 'pinch') return;
     previewScale = undefined;
+    previewOwner = undefined;
     if (petWindow && !petWindow.isDestroyed()) resizeWindow(renderScale);
   });
   const url = new URL(page);
@@ -366,6 +378,19 @@ function companionMenu() {
 
 function updateTray() { tray?.setContextMenu(companionMenu()); }
 
+function saveHintState(state) {
+  hintState = state;
+  void hintStore.save(state).catch(() => console.warn('[cornerpet] could not save resize hint'));
+}
+
+// Dragging is when people handle the pet, so that is when it mentions resizing.
+function offerResizeHint() {
+  const { show, state } = nextResizeHint(hintState, { sleeping: behavior.getSnapshot().state === 'sleep', pinching: previewOwner === 'pinch' });
+  if (!show) return;
+  saveHintState(state);
+  if (petWindow && !petWindow.isDestroyed()) petWindow.webContents.send('pet:resize-hint');
+}
+
 function finishDrag() {
   updateDrag();
   clearInterval(dragTimer);
@@ -390,8 +415,40 @@ ipcMain.handle('pet:scale', (event, scale) => {
   return setPetScale(scale);
 });
 ipcMain.handle('pet:scale-options', event => {
-  if (!sizeWindow || !trusted(event, sizeWindow)) throw new Error('Untrusted sender');
+  if (!trusted(event) && !trusted(event, sizeWindow)) throw new Error('Untrusted sender');
   return scaleOptions();
+});
+ipcMain.handle('pet:resize-preview', (event, scale) => {
+  if (!trusted(event)) throw new Error('Untrusted sender');
+  if (!Number.isFinite(scale)) throw new Error('Invalid pet scale');
+  if (drag) return renderScale;
+  if (previewOwner !== 'pinch') {
+    previewOwner = 'pinch';
+    sizeWindow?.close();
+  }
+  const { min, max } = scaleOptions();
+  previewScale = Math.min(max, Math.max(min, scale));
+  resizeWindow(renderScale);
+  return renderScale;
+});
+ipcMain.handle('pet:resize-commit', (event, scale) => {
+  if (!trusted(event)) throw new Error('Untrusted sender');
+  if (!Number.isFinite(scale)) throw new Error('Invalid pet scale');
+  const { min, max } = scaleOptions();
+  return setPetScale(Math.round(Math.min(max, Math.max(min, scale)) * 100) / 100);
+});
+ipcMain.handle('pet:resize-cancel', event => {
+  if (!trusted(event)) throw new Error('Untrusted sender');
+  if (previewOwner !== 'pinch') return renderScale;
+  previewScale = undefined;
+  previewOwner = undefined;
+  resizeWindow(renderScale);
+  return renderScale;
+});
+// An unfocused window receives only a few coarse pinch events; taking focus
+// on the first one is the same as the click that starts every drag.
+ipcMain.on('pet:focus', event => {
+  if (trusted(event) && !petWindow.isFocused()) petWindow.focus();
 });
 ipcMain.handle('pet:scale-preview', (event, scale) => {
   if (!sizeWindow || !trusted(event, sizeWindow)) throw new Error('Untrusted sender');
@@ -399,6 +456,7 @@ ipcMain.handle('pet:scale-preview', (event, scale) => {
   if (!Number.isFinite(scale) || scale < min || scale > max) throw new Error(`大小请在 ${Math.round(min * 100)}%–${Math.round(max * 100)}% 之间`);
   finishDrag();
   previewScale = scale;
+  previewOwner = 'panel';
   resizeWindow(renderScale);
   return renderScale;
 });
