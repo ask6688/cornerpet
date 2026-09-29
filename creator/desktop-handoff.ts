@@ -21,7 +21,7 @@ function beginHandoff(pet: typeof PET): Promise<{ petId: string; name: string }>
   try { window.location.assign(buildConnectUrl(connection)); }
   catch {
     connection = undefined;
-    return Promise.reject(new Error('浏览器没能打开 CornerPet，请先安装桌面小窝，或下载小窝文件后双击打开'));
+    return Promise.reject(new Error('浏览器没能打开 CornerPet，请先下载并打开 macOS 安装包，或导出 .cornerpet 角色文件后双击打开'));
   }
   const paired = connection!;
   return deliver().catch(error => { if (connection === paired) connection = undefined; throw error; });
@@ -43,9 +43,9 @@ function beginHandoff(pet: typeof PET): Promise<{ petId: string; name: string }>
         return { petId: receipt.petId as string, name: receipt.name as string };
       }
       if (response?.status === 413) throw new Error('这只小生物的文件太大了，请缩小照片后再试');
-      if (response?.status === 400 || response?.status === 415) throw new Error('桌面小窝暂时无法读取这只小生物，请更新 CornerPet 或下载小窝文件');
+      if (response?.status === 400 || response?.status === 415) throw new Error('桌面小窝暂时无法读取这只小生物，请更新 CornerPet 或导出 .cornerpet 角色文件');
       await new Promise(resolve => setTimeout(resolve, 250));
     }
-    throw new Error('没能连上桌面小窝，请确认已安装并打开 CornerPet，并允许浏览器访问本地网络，再点一次试试，也可以下载小窝文件后双击打开');
+    throw new Error('没能连上桌面小窝，请确认已安装并打开 CornerPet，并允许浏览器访问本地网络，再点一次试试，也可以导出 .cornerpet 角色文件后双击打开');
   }
 }

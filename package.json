@@ -83,7 +83,8 @@
         "zip"
       ],
       "category": "public.app-category.entertainment",
-      "identity": null,
+      "identity": "-",
+      "hardenedRuntime": false,
       "extendInfo": {
         "LSUIElement": true
       }

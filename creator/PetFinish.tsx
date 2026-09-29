@@ -5,6 +5,8 @@ import { PET, normalizePetConfig, serializePetPackage } from '../shared/pet-conf
 import { startDesktopHandoff } from './desktop-handoff';
 import { PetReactionControls } from '../shared/PetReactionControls';
 
+const MAC_INSTALLER_URL = 'https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg';
+
 export function PetFinish({ pet, saveNote, saveState, onBusyChange, onChange, onRestart }: {
   pet: typeof PET; saveNote: string; saveState: 'saved' | 'saving' | 'failed'; onBusyChange: (busy: boolean) => void; onChange: (pet: typeof PET) => Promise<boolean>; onRestart: () => void;
 }) {
@@ -80,7 +82,8 @@ export function PetFinish({ pet, saveNote, saveState, onBusyChange, onChange, on
 
       <button className="bring-button" disabled={composing || dirty || saveState !== 'saved' || handoff === 'leaving'} onClick={bringHome}>{handoff === 'leaving' ? '正走向你的桌角…' : saveState === 'saving' ? '正在记住它…' : '带它去桌面'} <span aria-hidden="true">↗</span></button>
       <p className={`photo-handoff${handoff === 'failed' ? ' handoff-failed' : ''}`} role="status">{handoffNote}</p>
-      <details className="handoff-help" open={handoff === 'failed' || undefined}><summary>第一次见面 / 留一份小窝</summary><p>先在这台 Mac 安装并打开 CornerPet，浏览器询问时允许打开应用和连接本机；之后两种小伙伴都能直接送到桌角</p><button className="text-button" disabled={handoff === 'leaving' || composing} onClick={downloadHome}>下载小窝文件</button></details>
+      {handoff === 'failed' && <div className="desktop-install"><span>还没安装 CornerPet？</span><a href={MAC_INSTALLER_URL} target="_blank" rel="noopener noreferrer">下载 macOS 安装包 <span aria-hidden="true">↓</span></a><small>Apple Silicon · 安装并打开后，回到这里重试。已安装？请检查浏览器是否允许打开 App 和连接本机。</small></div>}
+      <details className="handoff-help" open={handoff === 'failed' || undefined}><summary>安装帮助 / 导出角色文件</summary><p>首次打开若提示无法验证开发者，确认安装包来源可信后，可在「系统设置 → 隐私与安全性」选择「仍要打开」。若提示 App 已损坏或会损坏电脑，请停止安装。浏览器询问时允许打开 CornerPet 和连接本机。</p><button className="text-button" disabled={handoff === 'leaving' || composing} onClick={downloadHome}>导出角色文件（.cornerpet）</button></details>
       <div className="photo-secondary">{pet.image2D && <a href={pet.image2D} download={`${pet.name}.png`}>下载透明 PNG ↓</a>}<button disabled={handoff === 'leaving'} onClick={async () => { const next = commitName(false); if (next && await onChange(next)) onRestart(); }}>再创建一只</button></div>
     </section>
   </section>;

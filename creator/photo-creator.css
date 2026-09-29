@@ -101,6 +101,10 @@
 .companion-save .text-button { text-decoration: underline; text-underline-offset: 4px; white-space: nowrap; }
 .companion-save > span { flex: 1; min-width: 140px; font-size: 11px; line-height: 1.7; color: #8E7A67; }
 .finish-name input[aria-invalid=true] { border-bottom-color: #A75E4D; }
+.desktop-install { display: grid; gap: 7px; margin: 0 0 12px; padding: 12px; border: 1px solid #DCCDBA; border-radius: 14px; background: #F5EEE4; color: #806A55; font-size: 11px; }
+.desktop-install a { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 40px; padding: 8px 13px; border-radius: 10px; background: #FFFDF8; color: #755943; font-size: 13px; font-weight: 600; text-decoration: none; }
+.desktop-install a:hover { background: #EDE2D4; }
+.desktop-install small { color: #99836E; font-size: 10px; line-height: 1.6; }
 .handoff-help { margin: 0 0 12px; color: #927961; font-size: 11px; line-height: 1.8; }
 .handoff-help summary { cursor: pointer; width: fit-content; }
 .handoff-help p { margin: 10px 0 2px; }

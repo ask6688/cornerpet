@@ -252,7 +252,7 @@ function App() {
       if (request === saveRequest.current) { setSaveState('saved'); setSaveNote('已保存在这个浏览器，下次打开还能见到它'); }
       return true;
     } catch {
-      if (request === saveRequest.current) { setSaveState('failed'); setSaveNote('这次没有保存成功，暂时不能带到桌面，可以重试保存，或下载小窝文件备份'); }
+      if (request === saveRequest.current) { setSaveState('failed'); setSaveNote('这次没有保存成功，暂时不能带到桌面，可以重试保存，或导出 .cornerpet 角色文件备份'); }
       return false;
     }
   }, []);

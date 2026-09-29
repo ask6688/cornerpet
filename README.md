@@ -113,17 +113,19 @@ DIY 工作台提供六种 3D 基础造型，下面是创建页中的实际选择
 | **Experimental / 待验证** | Seedream 真实 AI 风格化：接口已接入，仍需用真实服务与照片验证结果和部署环境。 |
 | **未实现** | 任意照片 → 可旋转 3D 模型。 |
 
-桌面端当前面向 Apple Silicon macOS；可在本机生成未签名 DMG / ZIP，尚无公开下载，也未完成公证或 Intel Mac 验收。
+桌面端当前面向 Apple Silicon macOS，提供临时签名的试用 DMG；尚未完成 Developer ID 签名、公证或 Intel Mac 验收。
 
 ## 9. Try it
 
 **[在线体验 Web 版](https://cornerpet-companion-test.netlify.app/)**：可以直接捏 3D 角色、上传照片做本地抠图，并体验命名、保存与预置风格化角色。当前测试站未接入可用的图片生成 API Key；点击创建后会说明这次使用预置示例，结果与上传照片无关。基础体验无需账号和 Key。
 
+**[下载 CornerPet macOS 安装包（Apple Silicon）](https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg)**：在 Web 完成页点「带它去桌面」时，若未能连接桌面 App，页面会说明原因并显示安装包入口。安装并打开 App 一次，回到原页面重试，按浏览器提示允许打开 App 和连接本机。首次打开若提示无法验证开发者，确认下载来源可信后，可在「系统设置 → 隐私与安全性」选择「仍要打开」；若提示 App 已损坏或会损坏电脑，请停止安装。这个试用包未获 Apple Developer ID 签名或公证。
+
 **不填 API Key 本地运行：** 按下方命令启动 Web，选 **DIY**，或选 **照片 → 保留它** 做本地抠图。选 **照片 → 捏成桌角生物** 时，页面默认使用预置 Demo，并明确提示结果并非根据照片生成。
 
 **使用自己的 API Key：** 在仓库根目录把 `.env.example` 复制为 `.env`，填写自己的 `ARK_API_KEY`，重启 `npm run dev` 并刷新网页。进入 **照片 → 捏成桌角生物**，上传照片，点“创建我的桌角生物”：有 Key 会自动尝试真实生成；没有 Key 会在点击后提示当前使用预置示例。页面不要求选择 Demo 或真实模式。这里只检测到服务端是否配置了 Key，不能保证 Key 有效或生成质量；调用可能产生费用，真实生成失败时可以主动改用预置示例。Key 不填在网页里，也不会发送给浏览器。
 
-要体验桌面交接，需要在同一台 Mac 启动 Electron 开发版，浏览器按提示允许打开应用与访问本机连接。
+也可以在同一台 Mac 用 `npm run desktop` 启动 Electron 开发版体验桌面交接。
 
 ## 10. Run locally
 
@@ -137,10 +139,10 @@ npm run dev          # http://127.0.0.1:5173/
 npm test
 npm run build
 npm run desktop      # macOS：构建后启动 Electron 开发版
-npm run dist:mac     # 可选：在 Apple Silicon Mac 本机生成未签名 DMG / ZIP
+npm run dist:mac     # 可选：在 Apple Silicon Mac 本机生成临时签名的 DMG / ZIP
 ```
 
-只有实验真实生成时才需配置密钥：在仓库根目录运行 `cp .env.example .env`，用编辑器打开 `.env`，将 `ARK_API_KEY=` 后填上自己的火山方舟 Key；`ARK_IMAGE_MODEL` 可留空。保存后重启开发服务器。`.env` 已被 Git 忽略；浏览器只读取“是否可用”的布尔状态，读不到 Key。**在线体验站不提供给访客填写 Key 的入口**；要用自己的 Key，请克隆仓库后在本地配置。公开部署需同时部署 `dist/` 与 `netlify/functions/`，在部署平台的服务端环境变量中配置 Key；若模型权限尚未开通，可设置 `CORNERPET_DEMO_ONLY=true` 暂时让站点只体验预置示例。纯静态部署只提供无 Key 的基础体验。生成的安装文件留在已忽略的 `release/`，目前尚未提供公开下载；它们未签名、未公证，也未做 Intel Mac 验收。
+只有实验真实生成时才需配置密钥：在仓库根目录运行 `cp .env.example .env`，用编辑器打开 `.env`，将 `ARK_API_KEY=` 后填上自己的火山方舟 Key；`ARK_IMAGE_MODEL` 可留空。保存后重启开发服务器。`.env` 已被 Git 忽略；浏览器只读取“是否可用”的布尔状态，读不到 Key。**在线体验站不提供给访客填写 Key 的入口**；要用自己的 Key，请克隆仓库后在本地配置。公开部署需同时部署 `dist/` 与 `netlify/functions/`，在部署平台的服务端环境变量中配置 Key；若模型权限尚未开通，可设置 `CORNERPET_DEMO_ONLY=true` 暂时让站点只体验预置示例。纯静态部署只提供无 Key 的基础体验。自行打包的文件留在已忽略的 `release/`；它们只有临时签名，尚无 Developer ID 签名或公证，也未做 Intel Mac 验收。
 
 ## 11. Tech Stack
 
@@ -149,5 +151,5 @@ React、TypeScript、Three.js / React Three Fiber、Vite、Electron、ONNX Runti
 ## 12. Roadmap
 
 - 用真实服务和多种授权照片验收 Seedream 输出质量、透明度与表情一致性。
-- 决定未签名的 Apple Silicon 安装包如何对外提供，再评估签名／公证与 Intel Mac 适配。
+- 评估 Developer ID 签名、公证与 Intel Mac 适配，减少首次安装阻力。
 - 继续评估透明窗口空白区域点击穿透与照片 3D 化；后者目前没有可交付方案。
