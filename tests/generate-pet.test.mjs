@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { generatePet, generationConfigured, handleGenerationCapability } from '../server/generate-pet.mjs';
+import getNetlifyGenerationCapability from '../netlify/functions/generation-capability.mjs';
 
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const atlas = `data:image/png;base64,${readFileSync(new URL('./samples/expression-atlas.png', import.meta.url)).toString('base64')}`;
 
-test('capability exposes only whether the server has a key', () => {
+test('capability exposes only whether the server has a key', async () => {
   assert.equal(generationConfigured(''), false);
   const before = process.env.ARK_API_KEY;
   const beforeDemoOnly = process.env.CORNERPET_DEMO_ONLY;
@@ -24,6 +25,7 @@ test('capability exposes only whether the server has a key', () => {
     assert.equal(generationConfigured('test-secret'), false);
     handleGenerationCapability({ url: '/api/generation-capability', method: 'GET' }, response);
     assert.deepEqual(JSON.parse(response.body), { configured: false, demoOnly: true });
+    assert.deepEqual(await (await getNetlifyGenerationCapability()).json(), { configured: false, demoOnly: true });
   } finally {
     if (before === undefined) delete process.env.ARK_API_KEY;
     else process.env.ARK_API_KEY = before;
