@@ -1,0 +1,42 @@
+.image-pet { width: 100%; height: 100%; min-height: 220px; display: grid; place-items: center; box-sizing: border-box; padding: 15%; outline-offset: -20px; }
+.image-pet[role="button"] { cursor: pointer; }
+.image-pet-size { width: 100%; height: 100%; min-height: 0; position: relative; }
+.image-pet-motion { width: 100%; height: 100%; transform-origin: center 85%; animation: image-pet-breathe 4.8s ease-in-out infinite; }
+.image-pet-art { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; filter: drop-shadow(0 7px 6px #765e4d24); }
+.image-pet-atlas { overflow: hidden; }
+.image-pet.reacting .image-pet-motion { animation: image-pet-greet .8s ease-in-out both; }
+.image-pet[data-motion="tilt"] .image-pet-motion { animation: image-pet-tilt 1.15s ease-in-out both; }
+.image-pet[data-motion="nod"] .image-pet-motion { animation: image-pet-nod 1.15s ease-in-out both; }
+.image-pet[data-motion="wobble"] .image-pet-motion { animation: image-pet-wobble 1.15s ease-in-out both; }
+.image-pet[data-motion="startle"] .image-pet-motion { animation: image-pet-startle 1.15s ease-in-out both; }
+.image-pet[data-motion="showcase"] .image-pet-motion { animation: image-pet-showcase 2.6s ease-in-out both; }
+.image-pet-blink { opacity: 0; animation: image-pet-blink 5.8s linear infinite; }
+.image-pet-sparks { position: absolute; inset: 0; pointer-events: none; color: #c18a68; font-family: Georgia, serif; font-size: clamp(19px, 2.4vw, 30px); }
+.image-pet-sparks span { position: absolute; opacity: 0; animation: image-pet-spark 1.5s ease-out both; }
+.image-pet-sparks span:nth-child(1) { left: 14%; top: 30%; }
+.image-pet-sparks span:nth-child(2) { right: 22%; top: 18%; animation-delay: .1s; }
+.image-pet-sparks span:nth-child(3) { right: 6%; top: 47%; animation-delay: .2s; }
+@keyframes image-pet-breathe { 0%, 100% { transform: translateY(2px) rotate(-.6deg) scale(1, .994); } 50% { transform: translateY(-3px) rotate(.6deg) scale(1, 1.006); } }
+@keyframes image-pet-greet { 0%, 100% { transform: none; } 25% { transform: translateY(3px) scale(1.04, .96) rotate(-2deg); } 55% { transform: translateY(-15px) scale(.98, 1.03) rotate(2deg); } 78% { transform: translateY(1px) scale(1.025, .98); } }
+@keyframes image-pet-tilt { 0%, 100% { transform: none; } 50% { transform: rotate(5deg) translateY(2px); } }
+@keyframes image-pet-nod { 0%, 100% { transform: none; } 50% { transform: translateY(7px) rotate(-2deg) scale(1.015, .96); } }
+@keyframes image-pet-wobble { 0%, 100% { transform: none; } 25%, 75% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+@keyframes image-pet-startle { 0%, 100% { transform: none; } 20% { transform: translateY(-9px) scale(.96, 1.06); } 40%, 65% { transform: rotate(-2deg); } 52% { transform: rotate(2deg); } }
+@keyframes image-pet-showcase { 0% { transform: none; } 12% { transform: translateY(3px) scale(1.04, .96); } 25% { transform: translateY(-17px) scale(.98, 1.03); } 36% { transform: none; } 40% { transform: perspective(700px) rotateY(0deg); } 82%, 100% { transform: perspective(700px) rotateY(360deg); } }
+@keyframes image-pet-blink { 0%, 91%, 96%, 100% { opacity: 0; } 92%, 95% { opacity: 1; } }
+@keyframes image-pet-spark { 0% { transform: translateY(6px) scale(.65); opacity: 0; } 20% { opacity: .85; } 100% { transform: translateY(-24px) scale(1.08); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .image-pet .image-pet-motion, .image-pet.reacting .image-pet-motion, .image-pet-blink, .image-pet-sparks span { animation: none; }
+  .image-pet.reacting .image-pet-art { filter: drop-shadow(0 0 8px #dbb9a2); }
+  .image-pet-sparks span { opacity: .7; }
+}
+
+/* Presence is supplied by behavior; the same asset can enter and leave sleep. */
+.image-pet[data-state="sleep"] .image-pet-motion { animation: image-pet-sleep 6s ease-in-out infinite; }
+.pet-zzz { position: absolute; z-index: 1; right: 19%; top: 13%; color: #917d6e; font: 16px Georgia, serif; letter-spacing: 3px; pointer-events: none; animation: pet-sleep-letters 4s ease-in-out infinite; }
+@keyframes image-pet-sleep { 0%, 100% { transform: translateY(7px) scale(1.015, .96); } 50% { transform: translateY(5px) scale(1.025, .97); } }
+@keyframes pet-sleep-letters { 0%, 100% { opacity: .35; transform: translateY(2px); } 50% { opacity: .8; transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) {
+  .image-pet[data-state="sleep"] .image-pet-motion { animation: none; transform: translateY(7px) scale(1.015, .96); }
+  .pet-zzz { animation: none; }
+}

@@ -1,0 +1,3 @@
+.pet-3d { position: relative; width: 100%; height: 100%; min-height: 220px; touch-action: none; }
+.pet-3d > canvas { display: block; width: 100% !important; height: 100% !important; outline: none; }
+.pet-3d > svg { width: 100%; height: 100%; }

@@ -1,0 +1,92 @@
+{
+  "name": "cornerpet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "桌角生物 · 一只安静住在桌角的小生命",
+  "author": "CornerPet",
+  "main": "desktop/main.mjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    "desktop": "npm run build && electron .",
+    "test": "node --test tests/*.test.mjs",
+    "pack:mac": "npm run build && electron-builder --mac --arm64 --dir",
+    "dist:mac": "npm run build && electron-builder --mac --arm64",
+    "pack:mac:universal": "npm run build && electron-builder --mac --universal --dir"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^11.1.0",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "onnxruntime-web": "^1.23.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "electron": "44.4.3",
+    "electron-builder": "26.15.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  },
+  "build": {
+    "appId": "com.cornerpet.desktop",
+    "productName": "CornerPet",
+    "artifactName": "CornerPet-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/main.mjs",
+      "desktop/layout.mjs",
+      "desktop/handoff.mjs",
+      "desktop/pet-storage.mjs",
+      "desktop/preload.cjs",
+      "shared/pet-config.mjs",
+      "shared/pet-state.mjs",
+      "shared/pet-interaction.mjs",
+      "shared/desktop-connect.mjs",
+      "package.json",
+      "!node_modules/**/*",
+      "!dist/models/**/*",
+      "!dist/examples/**/*",
+      "!dist/assets/photo-worker-*",
+      "!dist/assets/ort-wasm-*"
+    ],
+    "asar": true,
+    "fileAssociations": [
+      {
+        "ext": "cornerpet",
+        "name": "桌角生物资产",
+        "description": "桌角生物角色与透明 PNG",
+        "role": "Viewer",
+        "mimeType": "application/x-cornerpet"
+      }
+    ],
+    "protocols": [
+      {
+        "name": "桌角生物",
+        "schemes": [
+          "cornerpet"
+        ]
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.entertainment",
+      "identity": null,
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    }
+  }
+}

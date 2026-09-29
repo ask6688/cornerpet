@@ -1,0 +1,6 @@
+.pet-reaction-controls { display: grid; justify-items: center; gap: 10px; margin: 16px 0 6px; min-width: 0; }
+.pet-reaction-controls button { appearance: none; font: inherit; font-size: 11px; color: #806956; background: #FFFBF470; border: 1px solid #DED1C0; border-radius: 99px; padding: 7px 11px; cursor: pointer; }
+.pet-reaction-controls > div { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.pet-reaction-controls button:hover:not(:disabled) { border-color: #AE937A; background: #F3E6D5; }
+.pet-reaction-controls button:focus-visible { outline: 2px solid #8F755E; outline-offset: 3px; }
+.pet-reaction-controls button:disabled { opacity: .5; cursor: wait; }
