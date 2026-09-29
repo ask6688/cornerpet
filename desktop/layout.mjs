@@ -68,7 +68,7 @@ export function anchoredPetBounds(anchor, footprint, scale) {
 
 // The largest size that still fits above the feet, so a pinch never has to push the pet down.
 export function pinchRoom(anchor, footprint, area) {
-  return (anchor.y - area.y) / footprint.height;
+  return Math.floor((anchor.y - area.y) / footprint.height * 100) / 100;
 }
 
 export function resizedPetBounds(bounds, previousScale, nextScale, footprint, area) {

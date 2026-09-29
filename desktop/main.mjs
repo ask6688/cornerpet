@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu, Tray, screen, session, dialog, nativ
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PET, parseLaunchUrl } from '../shared/pet-config.mjs';
-import { DESKTOP_SIZE, DEFAULT_FOOTPRINT, validFootprint, containPet, desktopDragPosition, resizedPetBounds, visibleViewport, desktopScaleLimits } from './layout.mjs';
+import { DESKTOP_SIZE, DEFAULT_FOOTPRINT, validFootprint, containPet, desktopDragPosition, resizedPetBounds, visibleViewport, desktopScaleLimits, resizeAnchor, anchoredPetBounds, pinchRoom } from './layout.mjs';
 import { createHandoffServer, parseDesktopPackage } from './handoff.mjs';
 import { createPetStorage, readPetFile } from './pet-storage.mjs';
 import { DEFAULT_HINT_STATE, createResizeHintStore, nextResizeHint } from './resize-hint.mjs';
@@ -28,8 +28,8 @@ let petWindow;
 let sizeWindow;
 let renderScale = 1;
 let previewScale;
-// Who drives previewScale: the custom-size panel or a trackpad pinch.
-let previewOwner;
+// A pinch in progress: the fixed point it grows around and the sizes it may reach.
+let pinch;
 let tray;
 let footprint = DEFAULT_FOOTPRINT;
 let contentOffset = { x: 0, y: 0 };
@@ -182,6 +182,7 @@ function showPet(refresh = false) {
     petWindow.setTitle(`${launchPet.name} · 桌角生物`);
     if (refresh) {
       finishDrag();
+      pinch = undefined;
       footprint = DEFAULT_FOOTPRINT;
       resizeWindow();
       const loaded = petWindow.loadURL(page);
@@ -293,8 +294,17 @@ function resizeWindow(previousScale = petWindow.getBounds().width / DESKTOP_SIZE
   placeWindow(resizedPetBounds(bounds, previousScale, renderScale, footprint, displayArea(display)));
 }
 
+// After a pinch the window shrinks once, back around the same fixed point.
+function settleWindow() {
+  if (!pinch) return resizeWindow(renderScale);
+  const { anchor } = pinch;
+  pinch = undefined;
+  renderScale = Math.min(launchPet.scale, desktopScaleLimits(screen.getDisplayMatching(visualBounds()).workArea).max);
+  placeWindow(anchoredPetBounds(anchor, footprint, renderScale));
+}
+
 function keepOnDisplay() {
-  if (!petWindow || petWindow.isDestroyed()) return;
+  if (!petWindow || petWindow.isDestroyed() || pinch) return;
   finishDrag();
   const bounds = visualBounds();
   const display = screen.getDisplayMatching(bounds);
@@ -318,8 +328,7 @@ async function setPetScale(scale) {
   if (request !== importRequest) throw new Error('小伙伴已经换了一只，请重新调整');
   launchPet = next;
   previewScale = undefined;
-  previewOwner = undefined;
-  resizeWindow(renderScale);
+  settleWindow();
   updateTray();
   return scale;
 }
@@ -344,10 +353,9 @@ function showSizeWindow() {
   sizeWindow.once('ready-to-show', () => sizeWindow?.show());
   sizeWindow.on('closed', () => {
     sizeWindow = undefined;
-    // A pinch that closed this panel owns the preview now.
-    if (previewOwner === 'pinch') return;
+    // A pinch that closed this panel owns the window now.
+    if (pinch) return;
     previewScale = undefined;
-    previewOwner = undefined;
     if (petWindow && !petWindow.isDestroyed()) resizeWindow(renderScale);
   });
   const url = new URL(page);
@@ -384,7 +392,7 @@ function saveHintState(state) {
 
 // Dragging is when people handle the pet, so that is when it mentions resizing.
 function offerResizeHint() {
-  const { show, state } = nextResizeHint(hintState, { sleeping: behavior.getSnapshot().state === 'sleep', pinching: previewOwner === 'pinch' });
+  const { show, state } = nextResizeHint(hintState, { sleeping: behavior.getSnapshot().state === 'sleep', pinching: pinch !== undefined });
   if (!show) return;
   saveHintState(state);
   if (petWindow && !petWindow.isDestroyed()) petWindow.webContents.send('pet:resize-hint');
@@ -417,31 +425,36 @@ ipcMain.handle('pet:scale-options', event => {
   if (!trusted(event) && !trusted(event, sizeWindow)) throw new Error('Untrusted sender');
   return scaleOptions();
 });
-ipcMain.handle('pet:resize-preview', (event, scale) => {
+// A pinch grows the window once to the largest size it may reach. The page then scales the pet
+// with CSS around the fixed point, so the native window changes only at the start and the end.
+ipcMain.handle('pet:resize-begin', event => {
   if (!trusted(event)) throw new Error('Untrusted sender');
-  if (!Number.isFinite(scale)) throw new Error('Invalid pet scale');
-  if (drag) return renderScale;
-  if (previewOwner !== 'pinch') {
-    previewOwner = 'pinch';
-    sizeWindow?.close();
+  if (drag) return null;
+  if (!pinch) {
+    if (sizeWindow && !sizeWindow.isDestroyed()) {
+      previewScale = undefined;
+      sizeWindow.close();
+    }
+    const bounds = visualBounds(), display = screen.getDisplayMatching(bounds), area = displayArea(display);
+    const { min, max } = desktopScaleLimits(display.workArea);
+    const anchor = resizeAnchor(bounds, footprint, renderScale, area);
+    pinch = { anchor, limits: { min, max: Math.min(max, Math.max(renderScale, pinchRoom(anchor, footprint, area))) } };
+    placeWindow(anchoredPetBounds(anchor, footprint, pinch.limits.max));
   }
-  const { min, max } = scaleOptions();
-  previewScale = Math.min(max, Math.max(min, scale));
-  resizeWindow(renderScale);
-  return renderScale;
+  return { anchor: pinch.anchor, footprint, limits: pinch.limits };
 });
 ipcMain.handle('pet:resize-commit', (event, scale) => {
   if (!trusted(event)) throw new Error('Untrusted sender');
   if (!Number.isFinite(scale)) throw new Error('Invalid pet scale');
-  const { min, max } = scaleOptions();
+  const { min, max } = pinch?.limits ?? scaleOptions();
   return setPetScale(Math.round(Math.min(max, Math.max(min, scale)) * 100) / 100);
 });
 ipcMain.handle('pet:resize-cancel', event => {
   if (!trusted(event)) throw new Error('Untrusted sender');
-  if (previewOwner !== 'pinch') return renderScale;
-  previewScale = undefined;
-  previewOwner = undefined;
-  resizeWindow(renderScale);
+  if (!pinch) return renderScale;
+  const { anchor } = pinch;
+  pinch = undefined;
+  placeWindow(anchoredPetBounds(anchor, footprint, renderScale));
   return renderScale;
 });
 // An unfocused window receives only a few coarse pinch events; taking focus
@@ -455,7 +468,6 @@ ipcMain.handle('pet:scale-preview', (event, scale) => {
   if (!Number.isFinite(scale) || scale < min || scale > max) throw new Error(`大小请在 ${Math.round(min * 100)}%–${Math.round(max * 100)}% 之间`);
   finishDrag();
   previewScale = scale;
-  previewOwner = 'panel';
   resizeWindow(renderScale);
   return renderScale;
 });

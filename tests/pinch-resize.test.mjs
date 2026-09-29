@@ -93,5 +93,6 @@ test('a pinch that ends at its starting size puts the window back exactly', () =
 
 test('a pinch grows only as tall as the room above the feet', () => {
   const nearTop = resizeAnchor({ x: 600, y: area.y + 60 - body.y, ...DESKTOP_SIZE }, body, 1, area);
-  assert.equal(pinchRoom(nearTop, body, area), (60 + body.height) / body.height);
+  // Whole percents, like the other limits, so a saved size never lands just past the room.
+  assert.equal(pinchRoom(nearTop, body, area), Math.floor((60 + body.height) / body.height * 100) / 100);
 });

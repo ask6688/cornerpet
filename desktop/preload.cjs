@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('cornerpet', Object.freeze({
   },
   getConfig: () => ipcRenderer.invoke('pet:config'),
   setScale: scale => ipcRenderer.invoke('pet:scale', scale),
-  resizePreview: scale => ipcRenderer.invoke('pet:resize-preview', scale),
+  resizeBegin: () => ipcRenderer.invoke('pet:resize-begin'),
   resizeCommit: scale => ipcRenderer.invoke('pet:resize-commit', scale),
   resizeCancel: () => ipcRenderer.invoke('pet:resize-cancel'),
   focusPet: () => ipcRenderer.send('pet:focus'),

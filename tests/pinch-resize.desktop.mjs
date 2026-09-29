@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { createPetModel, parsePetPackage, serializePetPackage } from '../shared/pet-config.mjs';
+import { anchoredPetBounds, imageFootprint, resizeAnchor } from '../desktop/layout.mjs';
 const { _electron } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright');
 const executablePath = process.env.CORNERPET_APP;
 assert.ok(executablePath, 'Set CORNERPET_APP to the packaged executable');
@@ -38,8 +39,10 @@ const photoPet = createPetModel({ source: 'upload', model3D: null, image2D: 'dat
 let app;
 try {
   await writeFile(files.pet, serializePetPackage(photoPet));
-  await writeFile(files.hint, JSON.stringify({ shown: 0, learned: false }));
+  await writeFile(files.hint, JSON.stringify({ shown: 0 }));
   app = await _electron.launch({ executablePath, args: [`--user-data-dir=${data}`], env });
+  // Surface the main process's own warnings (for example a failed save) if a check times out.
+  for (const stream of [app.process().stdout, app.process().stderr]) stream.on('data', chunk => String(chunk).split('\n').filter(line => line.includes('[cornerpet]')).forEach(line => console.log('[main]', line)));
   const page = await app.firstWindow();
   await page.locator('.pet-grab').waitFor();
   const pinch = deltas => page.evaluate(async list => {
@@ -52,12 +55,29 @@ try {
   // waitForFunction does not await a returned Promise, so bridge calls are polled from here.
   const until = async (probe, label) => {
     for (const end = Date.now() + 5000; !(await probe());) {
-      if (Date.now() > end) throw new Error('Timed out waiting for ' + label);
+      if (Date.now() > end) throw new Error('Timed out waiting for ' + (typeof label === 'function' ? label() : label));
       await new Promise(resolve => setTimeout(resolve, 50));
     }
   };
-  const saved = scale => until(async () => await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)) === scale, 'saved scale ' + scale);
+  let lastSaved;
+  const saved = scale => until(async () => (lastSaved = await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale))) === scale, () => 'saved scale ' + scale + ', still ' + lastSaved);
   const petWidth = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(window => !window.webContents.getURL().includes('panel=size')).getBounds().width);
+  const petBounds = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(window => !window.webContents.getURL().includes('panel=size')).getBounds());
+  // Count native window changes, and let the test move the cursor the main process reads.
+  await app.evaluate(({ BrowserWindow, screen }) => {
+    const pet = BrowserWindow.getAllWindows()[0], setBounds = pet.setBounds.bind(pet), cursor = screen.getCursorScreenPoint.bind(screen);
+    globalThis.nativeResizes = 0;
+    pet.setBounds = (...args) => { globalThis.nativeResizes++; return setBounds(...args); };
+    globalThis.cursorShift = 0;
+    screen.getCursorScreenPoint = () => { const point = cursor(); return { x: point.x + globalThis.cursorShift, y: point.y }; };
+  });
+  const nativeResizes = () => app.evaluate(() => globalThis.nativeResizes);
+  const area = await app.evaluate(({ BrowserWindow, screen }) => {
+    const display = screen.getDisplayMatching(BrowserWindow.getAllWindows()[0].getBounds()), top = Math.max(display.bounds.y, display.workArea.y);
+    return { ...display.bounds, y: top, height: display.bounds.y + display.bounds.height - top };
+  });
+  // The noise photo is opaque somewhere along every edge, so its body is the whole picture.
+  const body = imageFootprint(192, 192, { x: 0, y: 0, width: 192, height: 192 });
   const { max } = await page.evaluate(() => window.cornerpet.getScaleOptions());
   assert.ok(max >= 2.34, 'Run on a display with room for 234% (at least 656 × 749 pt of work area)');
 
@@ -67,18 +87,25 @@ try {
   await says(hint);
   await until(async () => (await page.locator('.pet-bubble').textContent()) !== hint, 'the hint to fade');
 
-  // A recorded pinch grows the pet live, then saves once the fingers stop.
+  // A recorded pinch grows the pet around a fixed point: the window grows once, the pet scales
+  // inside it with CSS, and the window shrinks once when the fingers stop. Feet stay planted.
+  await page.waitForTimeout(300);
+  const before = await petBounds(), resizesBefore = await nativeResizes();
   await pinch(recorded);
   await says('234%');
   await saved(2.34);
+  assert.equal(await nativeResizes() - resizesBefore, 2, 'the native window changes only when a pinch starts and ends');
+  assert.deepEqual(await petBounds(), anchoredPetBounds(resizeAnchor(before, body, 1, area), body, 2.34));
   assert.equal(await petWidth(), Math.round(280 * 2.34));
   assert.equal(parsePetPackage(await readFile(files.pet, 'utf8')).scale, 2.34);
-  assert.deepEqual(JSON.parse(await readFile(files.hint, 'utf8')), { shown: 0, learned: true });
+  assert.deepEqual(JSON.parse(await readFile(files.hint, 'utf8')), { shown: 0 });
 
   // Pinching back near 100% lands on exactly 100%.
   await pinch(Array(10).fill(8.5));
   await says('刚刚好');
   await saved(1);
+  const back = await petBounds();
+  assert.ok(Math.abs(back.x - before.x) <= 1 && Math.abs(back.y - before.y) <= 1 && back.width === before.width, `shrinking back returns to the same place: ${JSON.stringify(before)} → ${JSON.stringify(back)}`);
 
   // Coarse unfocused-style bursts are bounded: e^0.40 ≈ 1.49, no jump to a limit.
   await pinch([-4, -59.786, -287.393, -398.399]);
@@ -128,6 +155,20 @@ try {
   await page.waitForTimeout(120);
   assert.ok(await petWidth() > Math.round(280 * 1.66), 'the next pinch previews live after a tap');
   await saved(1.95);
+
+  // Real drags show the hint on the first three, even though this pet has been resized many
+  // times; the fourth drag is quiet.
+  await until(async () => (await page.locator('.pet-bubble').textContent()) === '', 'a quiet bubble');
+  for (let drag = 1; drag <= 4; drag++) {
+    await page.mouse.down();
+    await app.evaluate((_, shift) => { globalThis.cursorShift = shift; }, drag * 30);
+    await page.waitForTimeout(150);
+    const during = await page.locator('.pet-bubble').textContent();
+    await page.mouse.up();
+    if (drag <= 3) assert.equal(during, hint, 'drag ' + drag + ' explains resizing');
+    else assert.notEqual(during, hint, 'the fourth drag is quiet');
+    await until(async () => (await page.locator('.pet-bubble').textContent()) !== hint, 'the hint to fade after drag ' + drag);
+  }
 
   // When the size cannot be saved, the pet returns to its saved size and says so.
   await chmod(data, 0o500);

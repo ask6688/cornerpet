@@ -8,7 +8,10 @@ import { DEFAULT_FOOTPRINT, DESKTOP_SIZE, bubblePlacement, imageFootprint, pinch
 import './style.css';
 type Rect = { x: number; y: number; width: number; height: number };
 type Limits = { min: number; max: number };
-type Pinch = { raw: number; limits: Limits; frame: number; settle?: ReturnType<typeof setTimeout> };
+type View = { scale: number; offset: { x: number; y: number }; viewport: Rect };
+type Anchor = { x: number; y: number; ax: number };
+type Pinch = { raw: number; start: number; limits: Limits; begun: Promise<boolean>; anchor?: Anchor; body?: Rect; final?: number; settle?: ReturnType<typeof setTimeout> };
+const viewTransform = (view: View) => `translate(${view.offset.x}px, ${view.offset.y}px) scale(${view.scale})`;
 const RESIZE_HINT = '想换个大小？在我身上双指捏一捏，或者右键我～';
 
 function resizeLabel(display: ReturnType<typeof pinchDisplay>) {
@@ -37,7 +40,7 @@ function DesktopPet() {
   }
   const [error, setError] = useState('');
   const [footprint, setFootprint] = useState<Rect>(DEFAULT_FOOTPRINT);
-  const [view, setView] = useState<{ scale: number; offset: { x: number; y: number }; viewport: Rect }>({ scale: 1, offset: { x: 0, y: 0 }, viewport: { x: 0, y: 0, ...DESKTOP_SIZE } });
+  const [view, setView] = useState<View>({ scale: 1, offset: { x: 0, y: 0 }, viewport: { x: 0, y: 0, ...DESKTOP_SIZE } });
   const speech = useRef<HTMLDivElement>(null);
   const [speechHeight, setSpeechHeight] = useState(38);
   useEffect(() => {
@@ -50,9 +53,13 @@ function DesktopPet() {
   const [hinting, setHinting] = useState(false);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const petLayer = useRef<HTMLElement>(null);
   const viewScale = useRef(1);
   const limits = useRef<Limits>({ min: DESKTOP_SCALE_LIMITS.min, max: DESKTOP_SCALE_LIMITS.max });
   const pinch = useRef<Pinch | null>(null);
+  // A pinch being saved keeps the layout until the window has shrunk back around its fixed point.
+  const settling = useRef<Pinch | null>(null);
+  const heldView = useRef<View | null>(null);
   const commitPinch = useRef<() => Promise<void>>(async () => {});
   useEffect(() => { viewScale.current = view.scale; }, [view.scale]);
   useEffect(() => window.cornerpet.onResizeHint(() => {
@@ -68,54 +75,93 @@ function DesktopPet() {
       setResizeNote(text);
       if (linger) noteTimer.current = setTimeout(() => setResizeNote(''), 1200);
     }
+    // Place the pet around the pinch's fixed point from this window's own position, so the first
+    // frame after the window grows or shrinks is already right. No message to the main process.
+    function layout() {
+      const gesture = pinch.current ?? settling.current;
+      if (!gesture?.anchor || !gesture.body || !petLayer.current) return;
+      const { anchor, body } = gesture, scale = gesture.final ?? pinchDisplay(gesture.raw, gesture.limits).scale;
+      const x = anchor.x - (body.x + anchor.ax * body.width) * scale - window.screenX;
+      const y = anchor.y - (body.y + body.height) * scale - window.screenY;
+      petLayer.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    }
+    // Hand the layout back to the main process's view once the window has settled.
+    function release(gesture: Pinch) {
+      if (settling.current !== gesture) return;
+      settling.current = null;
+      const apply = (value: View) => {
+        heldView.current = null;
+        if (petLayer.current) petLayer.current.style.transform = viewTransform(value);
+        setView(value);
+      };
+      if (heldView.current) apply(heldView.current);
+      else window.cornerpet.getView().then(apply).catch(() => {});
+    }
+    const settled = (gesture: Pinch) => gesture.final !== undefined && Math.abs(innerWidth - DESKTOP_SIZE.width * gesture.final) <= 1;
+    function onResize() {
+      layout();
+      if (settling.current && settled(settling.current)) release(settling.current);
+    }
     async function commit(gesture: Pinch) {
       if (pinch.current !== gesture) return;
       pinch.current = null;
       clearTimeout(gesture.settle);
-      cancelAnimationFrame(gesture.frame);
+      settling.current = gesture;
+      if (!(await gesture.begun)) {
+        // A drag owned the window, so nothing grew and nothing is saved.
+        show('');
+        release(gesture);
+        return;
+      }
       try {
-        const saved = await window.cornerpet.resizeCommit(settleScale(gesture.raw, gesture.limits));
-        show(resizeLabel(pinchDisplay(saved, gesture.limits)), true);
+        gesture.final = await window.cornerpet.resizeCommit(settleScale(gesture.raw, gesture.limits));
+        show(resizeLabel(pinchDisplay(gesture.final, gesture.limits)), true);
       } catch {
+        gesture.final = gesture.start;
         await window.cornerpet.resizeCancel().catch(() => {});
         show('大小暂时没能记住，再捏一下试试', true);
       }
+      layout();
+      if (settled(gesture)) release(gesture);
+      else setTimeout(() => release(gesture), 600);
     }
     commitPinch.current = async () => { if (pinch.current) await commit(pinch.current); };
     function onWheel(event: WheelEvent) {
       if (!event.ctrlKey) return;
       event.preventDefault();
-      if (pressed.current) return;
+      if (pressed.current || settling.current) return;
       if (!document.hasFocus()) window.cornerpet.focusPet();
       let gesture = pinch.current;
       if (!gesture) {
-        const started: Pinch = { raw: viewScale.current, limits: limits.current, frame: 0 };
+        const started: Pinch = { raw: viewScale.current, start: viewScale.current, limits: limits.current, begun: Promise.resolve(false) };
+        started.begun = window.cornerpet.resizeBegin().then(reply => {
+          if (!reply) return false;
+          started.anchor = reply.anchor;
+          started.body = reply.footprint;
+          started.limits = reply.limits;
+          started.raw = Math.min(reply.limits.max, Math.max(reply.limits.min, started.raw));
+          layout();
+          return true;
+        }).catch(() => false);
         gesture = pinch.current = started;
         setHinting(false);
-        window.cornerpet.getScaleOptions().then(options => {
-          limits.current = { min: options.min, max: options.max };
-          if (pinch.current !== started) return;
-          started.limits = limits.current;
-          started.raw = Math.min(options.max, Math.max(options.min, started.raw));
-        }).catch(() => {});
       }
       const current = gesture;
       current.raw = pinchStep(current.raw, event.deltaY, current.limits);
       show(resizeLabel(pinchDisplay(current.raw, current.limits)));
-      // Resize the native window at most once per frame.
-      if (!current.frame) current.frame = requestAnimationFrame(() => {
-        current.frame = 0;
-        void window.cornerpet.resizePreview(pinchDisplay(current.raw, current.limits).scale).catch(() => {});
-      });
+      layout();
       clearTimeout(current.settle);
       current.settle = setTimeout(() => void commit(current), 400);
     }
     addEventListener('wheel', onWheel, { passive: false });
-    return () => { removeEventListener('wheel', onWheel); clearTimeout(noteTimer.current); clearTimeout(hintTimer.current); };
+    addEventListener('resize', onResize);
+    return () => { removeEventListener('wheel', onWheel); removeEventListener('resize', onResize); clearTimeout(noteTimer.current); clearTimeout(hintTimer.current); };
   }, []);
   useEffect(() => {
-    const unsubscribe = window.cornerpet.onView(setView);
-    window.cornerpet.getView().then(setView).catch(() => setError('位置暂时没能准备好'));
+    // While a pinch owns the layout, the main process's view waits until the window has settled.
+    const receive = (value: View) => { if (pinch.current || settling.current) heldView.current = value; else setView(value); };
+    const unsubscribe = window.cornerpet.onView(receive);
+    window.cornerpet.getView().then(receive).catch(() => setError('位置暂时没能准备好'));
     window.cornerpet.getConfig().then(value => {
       setConfig(value);
       document.title = `${value.name} · 桌角生物`;
@@ -181,7 +227,7 @@ function DesktopPet() {
   }
   const speechText = error || resizeNote || (hinting ? RESIZE_HINT : '') || message;
   const bubble = bubblePlacement(footprint, view.viewport, speechHeight);
-  return <main className="desktop-pet" data-state={behavior.state} style={{ transform: `translate(${view.offset.x}px, ${view.offset.y}px) scale(${view.scale})` }}>
+  return <main ref={petLayer} className="desktop-pet" data-state={behavior.state} style={{ transform: viewTransform(view) }}>
     <div ref={speech} className={`pet-bubble${speechText ? ' visible' : ''}${bubble.below ? ' below' : ''}`} style={{ left: bubble.x, top: bubble.y, width: bubble.width, '--tail-x': `${bubble.tail}px` } as CSSProperties} role="status">{speechText}</div>
     {config && <div className="pet-grab" role="button" tabIndex={0} aria-label={`${config.name}：拖动移动，点击打招呼，双指捏合或右键调整大小`}
       onPointerDown={start} onPointerUp={end} onPointerCancel={e => end(e, true)}
