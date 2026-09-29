@@ -105,6 +105,9 @@
 .desktop-install a { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 40px; padding: 8px 13px; border-radius: 10px; background: #FFFDF8; color: #755943; font-size: 13px; font-weight: 600; text-decoration: none; }
 .desktop-install a:hover { background: #EDE2D4; }
 .desktop-install small { color: #99836E; font-size: 10px; line-height: 1.6; }
+.install-command { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 10px; background: #FFFDF8; }
+.install-command code { flex: 1; min-width: 0; color: #755943; font: 10px/1.6 ui-monospace, monospace; word-break: break-all; user-select: all; }
+.install-command button { flex: none; border: 0; padding: 0; background: transparent; color: #805A42; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .handoff-help { margin: 0 0 12px; color: #927961; font-size: 11px; line-height: 1.8; }
 .handoff-help summary { cursor: pointer; width: fit-content; }
 .handoff-help p { margin: 10px 0 2px; }

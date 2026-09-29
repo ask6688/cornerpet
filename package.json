@@ -6,11 +6,14 @@
   "description": "桌角生物 · 一只安静住在桌角的小生命",
   "author": "CornerPet",
   "main": "desktop/main.mjs",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
-    "desktop": "npm run build && electron .",
+    "desktop": "npm run build && env -u ELECTRON_RUN_AS_NODE electron .",
     "test": "node --test tests/*.test.mjs",
     "pack:mac": "npm run build && electron-builder --mac --arm64 --dir",
     "dist:mac": "npm run build && electron-builder --mac --arm64",
@@ -60,6 +63,9 @@
       "!dist/assets/ort-wasm-*"
     ],
     "asar": true,
+    "electronFuses": {
+      "runAsNode": false
+    },
     "fileAssociations": [
       {
         "ext": "cornerpet",
