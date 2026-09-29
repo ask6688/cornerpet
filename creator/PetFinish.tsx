@@ -6,6 +6,8 @@ import { startDesktopHandoff } from './desktop-handoff';
 import { PetReactionControls } from '../shared/PetReactionControls';
 
 const MAC_INSTALLER_URL = 'https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg';
+// A command-line install carries no browser quarantine flag, so macOS skips the "could not verify" prompt.
+const INSTALL_PROMPT = '帮我在终端运行这行命令安装 CornerPet：curl -fsSL https://raw.githubusercontent.com/ask6688/cornerpet/main/scripts/install-macos.sh | bash';
 
 export function PetFinish({ pet, saveNote, saveState, onBusyChange, onChange, onRestart }: {
   pet: typeof PET; saveNote: string; saveState: 'saved' | 'saving' | 'failed'; onBusyChange: (busy: boolean) => void; onChange: (pet: typeof PET) => Promise<boolean>; onRestart: () => void;
@@ -16,6 +18,7 @@ export function PetFinish({ pet, saveNote, saveState, onBusyChange, onChange, on
   const [nameError, setNameError] = useState('');
   const [handoff, setHandoff] = useState<'idle' | 'leaving' | 'arrived' | 'failed'>('idle');
   const [handoffNote, setHandoffNote] = useState('名字和模样，会一起去你的桌角');
+  const [copied, setCopied] = useState<'idle' | 'done' | 'failed'>('idle');
   useEffect(() => { onBusyChange(handoff === 'leaving'); return () => onBusyChange(false); }, [handoff, onBusyChange]);
   const input = useRef<HTMLInputElement>(null);
   const normalizedName = normalizePetConfig({ name: draftName }).name;
@@ -82,8 +85,8 @@ export function PetFinish({ pet, saveNote, saveState, onBusyChange, onChange, on
 
       <button className="bring-button" disabled={composing || dirty || saveState !== 'saved' || handoff === 'leaving'} onClick={bringHome}>{handoff === 'leaving' ? '正走向你的桌角…' : saveState === 'saving' ? '正在记住它…' : '带它去桌面'} <span aria-hidden="true">↗</span></button>
       <p className={`photo-handoff${handoff === 'failed' ? ' handoff-failed' : ''}`} role="status">{handoffNote}</p>
-      {handoff === 'failed' && <div className="desktop-install"><span>还没安装 CornerPet？</span><a href={MAC_INSTALLER_URL} target="_blank" rel="noopener noreferrer">下载 macOS 安装包 <span aria-hidden="true">↓</span></a><small>Apple Silicon · 安装并打开后，回到这里重试。已安装？请检查浏览器是否允许打开 App 和连接本机。</small></div>}
-      <details className="handoff-help" open={handoff === 'failed' || undefined}><summary>安装帮助 / 导出角色文件</summary><p>首次打开若提示无法验证开发者，确认安装包来源可信后，可在「系统设置 → 隐私与安全性」选择「仍要打开」。若提示 App 已损坏或会损坏电脑，请停止安装。浏览器询问时允许打开 CornerPet 和连接本机。</p><button className="text-button" disabled={handoff === 'leaving' || composing} onClick={downloadHome}>导出角色文件（.cornerpet）</button></details>
+      {handoff === 'failed' && <div className="desktop-install"><span>还没安装 CornerPet？把这句话发给你的 AI 助手，它会帮你装好并打开：</span><div className="install-command"><code>{INSTALL_PROMPT}</code><button type="button" onClick={() => navigator.clipboard.writeText(INSTALL_PROMPT).then(() => setCopied('done'), () => setCopied('failed'))}>{copied === 'done' ? '已复制' : copied === 'failed' ? '请手动复制' : '复制'}</button></div><a href={MAC_INSTALLER_URL} target="_blank" rel="noopener noreferrer">或下载 macOS 安装包 <span aria-hidden="true">↓</span></a><small>Apple Silicon · 自己动手也可以只把 curl 开头的那一行粘贴到「终端」运行。装好后回到这里重试。已安装？请检查浏览器是否允许打开 App 和连接本机。</small></div>}
+      <details className="handoff-help" open={handoff === 'failed' || undefined}><summary>安装帮助 / 导出角色文件</summary><p>用安装包首次打开时，若弹出「Apple 无法验证“CornerPet”是否包含恶意软件」，是因为 App 还没有 Apple 公证，并不代表查出了问题：可在「系统设置 → 隐私与安全性」选择「仍要打开」，或改用 AI 安装那一行命令，它不会触发这个提示。若提示「已损坏，无法打开」或「将对你的电脑造成伤害」，请停止安装。浏览器询问时允许打开 CornerPet 和连接本机。</p><button className="text-button" disabled={handoff === 'leaving' || composing} onClick={downloadHome}>导出角色文件（.cornerpet）</button></details>
       <div className="photo-secondary">{pet.image2D && <a href={pet.image2D} download={`${pet.name}.png`}>下载透明 PNG ↓</a>}<button disabled={handoff === 'leaving'} onClick={async () => { const next = commitName(false); if (next && await onChange(next)) onRestart(); }}>再创建一只</button></div>
     </section>
   </section>;
