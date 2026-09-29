@@ -32,7 +32,6 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
   const [style, setStyle] = useState<GenerationStyle>('mochi');
   const [apiConfigured, setApiConfigured] = useState(false);
   const [apiChecked, setApiChecked] = useState(false);
-  const [demoOnly, setDemoOnly] = useState(false);
   const [generationNotice, setGenerationNotice] = useState('');
   const [failedReal, setFailedReal] = useState(false);
   const [subject, setSubject] = useState<'portrait' | 'object'>('portrait');
@@ -54,7 +53,6 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
         if (controller.signal.aborted) return;
         const configured = status?.configured === true;
         setApiConfigured(configured);
-        setDemoOnly(status?.demoOnly === true);
       })
       .catch(() => {})
       .finally(() => { if (!controller.signal.aborted) setApiChecked(true); });
@@ -90,7 +88,7 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
   }
   async function create(selectedProvider: GenerationProvider = apiConfigured ? 'doubao' : 'demo') {
     if (!photo || busy) return;
-    if (mode === 'generated') setGenerationNotice(selectedProvider === 'demo' ? apiConfigured ? '真实生成暂时不可用，已切换到预置示例；它不会根据你的照片生成。' : demoOnly ? '当前体验站尚未开放真实图片生成，这次会使用预置示例；它不会根据你的照片生成，照片也不会上传。' : '没有配置图片生成 Key，这次会使用预置示例；它不会根据你的照片生成，照片也不会上传。' : '');
+    if (mode === 'generated') setGenerationNotice(selectedProvider === 'demo' ? apiConfigured ? '真实生成暂时不可用，已切换到预置示例；它不会根据你的照片生成。' : '当前未接入可用的图片生成 API Key，将使用预置示例；照片不会上传。' : '');
     const signal = begin();
     try {
       setProgress(mode === 'original' ? '正在认出照片里的它…' : selectedProvider !== 'doubao' ? '正在请小伙伴慢慢走过来…' : '正在让它慢慢长成桌角生物…');
@@ -148,10 +146,10 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
           : <div className="generation-options">
             <div className="style-picker" role="group" aria-label="生成风格">{GENERATION_STYLES.map(item => <button disabled={busy} key={item.value} className={style === item.value ? 'selected' : ''} aria-pressed={style === item.value} onClick={() => { setStyle(item.value); reset(); }}><img src={item.preview} alt={`${item.label}风格参考`} /><span><b>{item.label}</b><small>{item.note}</small></span></button>)}</div>
             {apiConfigured && <div className="subject-picker"><span>照片里是</span><button disabled={busy} aria-pressed={subject === 'portrait'} onClick={() => { setSubject('portrait'); reset(); }}>人物</button><button disabled={busy} aria-pressed={subject === 'object'} onClick={() => { setSubject('object'); reset(); }}>宠物 · 小物</button></div>}
-            {generationNotice && <p className="generation-note" role="status">{generationNotice}</p>}
+            {generationNotice && !result && <p className="generation-note" role="status">{generationNotice}</p>}
           </div>}
         {error && <div className="photo-error" role="alert">{error}{mode === 'generated' && failedReal && !busy && <button onClick={() => void create('demo')}>使用预置示例继续 →</button>}</div>}
-        {result && <p className="generation-result-note" role="status">{result.generationProvider === 'demo' ? 'Demo 结果 · 这是预置小伙伴，并非根据你的照片生成，可以修整、命名，再带到桌面' : ['doubao', 'openai'].includes(result.generationProvider ?? '') ? '已根据照片生成，可以擦掉多余的部分，再给它起个名字' : '透明底已经准备好了，可以继续修整，再给它起个名字'}</p>}
+        {result && <p className="generation-result-note" role="status">{result.generationProvider === 'demo' ? apiConfigured ? '真实生成暂时不可用，这是预置小伙伴，并非根据你的照片生成。' : '当前未接入可用的图片生成 API Key，这是预置小伙伴，并非根据你的照片生成；照片没有上传。' : ['doubao', 'openai'].includes(result.generationProvider ?? '') ? '已根据照片生成，可以擦掉多余的部分，再给它起个名字' : '透明底已经准备好了，可以继续修整，再给它起个名字'}</p>}
         {result ? <><button className="bring-button" disabled={busy} onClick={() => onReady(result)}>给它起个名字 <span>→</span></button><div className="photo-secondary"><button disabled={busy} onClick={() => void edit()}>擦掉多余的部分</button><button disabled={busy} onClick={reset}>重新制作</button></div></>
           : <button className="bring-button" disabled={!photo || busy || (mode === 'generated' && !apiChecked)} onClick={() => void create()}>{busy ? '再等它一小会…' : mode === 'original' ? '把它留下来' : '创建我的桌角生物'} <span>→</span></button>}
       </section>

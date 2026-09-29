@@ -3,6 +3,7 @@ import { Pet3D, type PetScreenBounds } from './Pet3D';
 import { PET, petDisplayMode } from './pet-config.mjs';
 import type { PetReaction } from './usePetInteraction';
 import { ImagePetFace } from './ImagePetFace';
+import { DEMO_FACE_RIGS } from './image-face-rigs.mjs';
 import { PET_STATE_MOODS, type PetState } from './pet-state.mjs';
 import './image-pet.css';
 
@@ -99,7 +100,7 @@ export function PetRenderer({ config = PET, presence = 'active', reaction, react
     <div className="image-pet-size">
       <div className="image-pet-motion" key={reaction?.instanceId ?? 'idle'}>
         {config.expressionAtlas ? <ImagePetExpressions atlas={config.expressionAtlas} mood={mood} />
-          : config.faceRig ? <ImagePetFace asset={config.image2D ?? ''} rig={config.faceRig} mood={mood} />
+          : config.faceRig ? <ImagePetFace asset={config.image2D ?? ''} rig={config.generationProvider === 'demo' ? DEMO_FACE_RIGS[config.style as keyof typeof DEMO_FACE_RIGS] ?? config.faceRig : config.faceRig} mood={mood} />
           : <img className="image-pet-art" src={config.image2D ?? ''} alt="" draggable={false} />}
         {onBounds && <ImageBounds asset={config.image2D ?? ''} onBounds={onBounds} />}
       </div>

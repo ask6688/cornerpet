@@ -20,7 +20,7 @@ async page => {
       await page.getByRole('button', { name: new RegExp(style === 'mochi' ? '糯米小团风格参考' : '口袋毛绒风格参考') }).click();
       await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
       await page.getByRole('button', { name: /给它起个名字/ }).waitFor();
-      assert(await page.locator('.generation-note').innerText().then(text => text.includes('没有配置图片生成 Key')), 'missing no-key disclosure after creation');
+      assert(await page.locator('.generation-result-note').innerText().then(text => text.includes('未接入可用的图片生成 API Key')), 'missing no-key disclosure after creation');
       assert(apiCalls === 0, 'Demo called the generation API');
       assert(await page.locator('.generation-result-note').innerText().then(text => text.includes('并非根据你的照片生成')), 'Demo provenance missing');
       assert(await page.locator('.image-pet').count() === 1, 'Demo image has no preview');
@@ -28,6 +28,25 @@ async page => {
       await page.locator('.image-pet[data-motion="showcase"]').waitFor();
       assert(await page.locator('.pet-speech').count() === 0, 'Demo showcase displayed speech');
       assert(await page.getByRole('group', { name: '试试小心情', exact: true }).getByRole('button').count() === 5, 'five mood controls missing');
+      await page.locator('.image-pet-expression > image, .image-pet-blink > image').waitFor();
+      await page.getByRole('button', { name: '开心', exact: true }).click();
+      const cleanFace = await page.locator('.image-pet-expression > image').getAttribute('href');
+      assert(cleanFace?.startsWith('data:image/png;base64,'), 'face-free Demo layer missing');
+      const oldFeatures = await page.evaluate(async ({ asset, style }) => {
+        const image = await createImageBitmap(await fetch(asset).then(response => response.blob()));
+        const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+        const context = canvas.getContext('2d'); context.drawImage(image, 0, 0); image.close();
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        const regions = style === 'mochi' ? [[495, 620, 539, 667], [711, 622, 754, 666], [589, 661, 661, 688]]
+          : [[484, 641, 535, 701], [725, 641, 776, 701], [591, 689, 672, 720]];
+        let dark = 0;
+        for (const [left, top, right, bottom] of regions) for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
+          const index = (y * canvas.width + x) * 4;
+          if (pixels[index + 3] > 200 && Math.max(pixels[index], pixels[index + 1], pixels[index + 2]) < 130) dark++;
+        }
+        return dark;
+      }, { asset: cleanFace, style });
+      assert(oldFeatures === 0, `${style} Demo left old eyes or mouth under its expression`);
       if (style === 'mochi') {
         await page.screenshot({ path: 'output/playwright/p2-demo-flow.png', fullPage: true });
         await page.setViewportSize({ width: 320, height: 568 });
@@ -119,7 +138,7 @@ async page => {
     await page.locator('.image-pet[data-motion="showcase"]').waitFor();
     assert(await page.locator('.pet-speech').count() === 0, 'fallback showcase displayed speech');
     assert(apiCalls === 1, 'fallback called AI again');
-    assert(await page.locator('.generation-result-note').innerText().then(text => text.includes('Demo 结果')), 'fallback hides Demo provenance');
+    assert(await page.locator('.generation-result-note').innerText().then(text => text.includes('预置小伙伴')), 'fallback hides Demo provenance');
     reports.push('Real service unavailable → explicit Demo fallback → usable result passed; no paid service called');
     return reports;
   } finally { await page.unroute('**/api/generation-capability'); await page.unroute('**/api/generate-pet'); }

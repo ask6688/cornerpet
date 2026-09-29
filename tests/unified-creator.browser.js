@@ -63,6 +63,7 @@ async page => {
       assert(await page.locator('.pet-speech').count() === 0, `${mode} showcase displayed speech`);
       if (mode === 'generated') {
         await page.locator('.image-pet-atlas').waitFor();
+        assert(await page.locator('.generation-note').count() === 0 && !((await page.locator('.generation-result-note').innerText()).includes('Key')), 'successful real generation showed a missing-key prompt');
         await page.getByRole('button', { name: '开心' }).click();
         assert(await page.locator('.image-pet-atlas').getAttribute('data-face-mood') === 'happy', 'generated expression did not change');
       }
