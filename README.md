@@ -117,7 +117,7 @@ DIY 工作台提供六种 3D 基础造型，下面是创建页中的实际选择
 
 ## 9. Try it
 
-**[在线体验 Web 版](https://cornerpet-companion-test.netlify.app/)**：可以直接捏 3D 角色、上传照片做本地抠图，并体验命名、保存与预置风格化角色。在线页面属于测试站；若服务端没有配置图片 API，照片风格化会明确标为预置 Demo，结果与上传照片无关。基础体验无需账号和 Key。
+**[在线体验 Web 版](https://cornerpet-companion-test.netlify.app/)**：可以直接捏 3D 角色、上传照片做本地抠图，并体验命名、保存与预置风格化角色。当前测试站暂未开放真实图片生成；点击创建后会说明这次使用预置示例，结果与上传照片无关。基础体验无需账号和 Key。
 
 **不填 API Key 本地运行：** 按下方命令启动 Web，选 **DIY**，或选 **照片 → 保留它** 做本地抠图。选 **照片 → 捏成桌角生物** 时，页面默认使用预置 Demo，并明确提示结果并非根据照片生成。
 
@@ -140,7 +140,7 @@ npm run desktop      # macOS：构建后启动 Electron 开发版
 npm run dist:mac     # 可选：在 Apple Silicon Mac 本机生成未签名 DMG / ZIP
 ```
 
-只有实验真实生成时才需配置密钥：在仓库根目录运行 `cp .env.example .env`，用编辑器打开 `.env`，将 `ARK_API_KEY=` 后填上自己的火山方舟 Key；`ARK_IMAGE_MODEL` 可留空。保存后重启开发服务器。`.env` 已被 Git 忽略；浏览器只读取“是否配置”的布尔状态，读不到 Key。**在线体验站不提供给访客填写 Key 的入口**；要用自己的 Key，请克隆仓库后在本地配置。公开部署需同时部署 `dist/` 与 `netlify/functions/`，在部署平台的服务端环境变量中配置 Key；纯静态部署只提供无 Key 的基础体验。生成的安装文件留在已忽略的 `release/`，目前尚未提供公开下载；它们未签名、未公证，也未做 Intel Mac 验收。
+只有实验真实生成时才需配置密钥：在仓库根目录运行 `cp .env.example .env`，用编辑器打开 `.env`，将 `ARK_API_KEY=` 后填上自己的火山方舟 Key；`ARK_IMAGE_MODEL` 可留空。保存后重启开发服务器。`.env` 已被 Git 忽略；浏览器只读取“是否可用”的布尔状态，读不到 Key。**在线体验站不提供给访客填写 Key 的入口**；要用自己的 Key，请克隆仓库后在本地配置。公开部署需同时部署 `dist/` 与 `netlify/functions/`，在部署平台的服务端环境变量中配置 Key；若模型权限尚未开通，可设置 `CORNERPET_DEMO_ONLY=true` 暂时让站点只体验预置示例。纯静态部署只提供无 Key 的基础体验。生成的安装文件留在已忽略的 `release/`，目前尚未提供公开下载；它们未签名、未公证，也未做 Intel Mac 验收。
 
 ## 11. Tech Stack
 

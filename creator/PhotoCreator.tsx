@@ -32,6 +32,7 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
   const [style, setStyle] = useState<GenerationStyle>('mochi');
   const [apiConfigured, setApiConfigured] = useState(false);
   const [apiChecked, setApiChecked] = useState(false);
+  const [demoOnly, setDemoOnly] = useState(false);
   const [generationNotice, setGenerationNotice] = useState('');
   const [failedReal, setFailedReal] = useState(false);
   const [subject, setSubject] = useState<'portrait' | 'object'>('portrait');
@@ -53,6 +54,7 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
         if (controller.signal.aborted) return;
         const configured = status?.configured === true;
         setApiConfigured(configured);
+        setDemoOnly(status?.demoOnly === true);
       })
       .catch(() => {})
       .finally(() => { if (!controller.signal.aborted) setApiChecked(true); });
@@ -88,7 +90,7 @@ export function PhotoCreator({ onBusyChange, onReady }: { onBusyChange: (busy: b
   }
   async function create(selectedProvider: GenerationProvider = apiConfigured ? 'doubao' : 'demo') {
     if (!photo || busy) return;
-    if (mode === 'generated') setGenerationNotice(selectedProvider === 'demo' ? apiConfigured ? '真实生成暂时不可用，已切换到预置示例；它不会根据你的照片生成。' : '没有配置图片生成 Key，这次会使用预置示例；它不会根据你的照片生成，照片也不会上传。' : '');
+    if (mode === 'generated') setGenerationNotice(selectedProvider === 'demo' ? apiConfigured ? '真实生成暂时不可用，已切换到预置示例；它不会根据你的照片生成。' : demoOnly ? '当前体验站尚未开放真实图片生成，这次会使用预置示例；它不会根据你的照片生成，照片也不会上传。' : '没有配置图片生成 Key，这次会使用预置示例；它不会根据你的照片生成，照片也不会上传。' : '');
     const signal = begin();
     try {
       setProgress(mode === 'original' ? '正在认出照片里的它…' : selectedProvider !== 'doubao' ? '正在请小伙伴慢慢走过来…' : '正在让它慢慢长成桌角生物…');

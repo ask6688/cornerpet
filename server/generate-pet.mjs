@@ -33,7 +33,11 @@ export function publicGenerationError(reason) {
 }
 
 export function generationConfigured(apiKey = process.env.ARK_API_KEY) {
-  return typeof apiKey === 'string' && !!apiKey.trim() && apiKey !== 'undefined';
+  return process.env.CORNERPET_DEMO_ONLY !== 'true' && typeof apiKey === 'string' && !!apiKey.trim() && apiKey !== 'undefined';
+}
+
+export function generationCapability() {
+  return { configured: generationConfigured(), demoOnly: process.env.CORNERPET_DEMO_ONLY === 'true' };
 }
 
 export function handleGenerationCapability(request, response, next) {
@@ -45,7 +49,7 @@ export function handleGenerationCapability(request, response, next) {
     response.end(JSON.stringify({ error: '只支持 GET 请求' }));
     return;
   }
-  response.end(JSON.stringify({ configured: generationConfigured() }));
+  response.end(JSON.stringify(generationCapability()));
 }
 
 export async function generatePet(input, options = {}) {

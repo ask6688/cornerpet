@@ -8,19 +8,27 @@ const atlas = `data:image/png;base64,${readFileSync(new URL('./samples/expressio
 
 test('capability exposes only whether the server has a key', () => {
   assert.equal(generationConfigured(''), false);
-  assert.equal(generationConfigured('test-key'), true);
   const before = process.env.ARK_API_KEY;
+  const beforeDemoOnly = process.env.CORNERPET_DEMO_ONLY;
+  delete process.env.CORNERPET_DEMO_ONLY;
+  assert.equal(generationConfigured('test-key'), true);
   process.env.ARK_API_KEY = 'test-secret';
   try {
     const headers = {};
     const response = { setHeader(name, value) { headers[name] = value; }, end(body) { this.body = body; } };
     handleGenerationCapability({ url: '/api/generation-capability', method: 'GET' }, response);
-    assert.deepEqual(JSON.parse(response.body), { configured: true });
+    assert.deepEqual(JSON.parse(response.body), { configured: true, demoOnly: false });
     assert.equal(headers['Cache-Control'], 'no-store');
     assert.doesNotMatch(response.body, /test-secret/);
+    process.env.CORNERPET_DEMO_ONLY = 'true';
+    assert.equal(generationConfigured('test-secret'), false);
+    handleGenerationCapability({ url: '/api/generation-capability', method: 'GET' }, response);
+    assert.deepEqual(JSON.parse(response.body), { configured: false, demoOnly: true });
   } finally {
     if (before === undefined) delete process.env.ARK_API_KEY;
     else process.env.ARK_API_KEY = before;
+    if (beforeDemoOnly === undefined) delete process.env.CORNERPET_DEMO_ONLY;
+    else process.env.CORNERPET_DEMO_ONLY = beforeDemoOnly;
   }
 });
 
