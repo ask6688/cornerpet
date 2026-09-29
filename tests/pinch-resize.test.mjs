@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PINCH, pinchStep, pinchDisplay, settleScale, desktopScaleLimits } from '../desktop/layout.mjs';
+import { PINCH, pinchStep, pinchDisplay, settleScale, desktopScaleLimits, resizeAnchor, anchoredPetBounds, pinchRoom, resizedPetBounds, DEFAULT_FOOTPRINT as body, DESKTOP_SIZE } from '../desktop/layout.mjs';
 
 const limits = { min: .5, max: 2.5 };
 const pinch = (start, deltas, range = limits) => deltas.reduce((raw, deltaY) => pinchStep(raw, deltaY, range), start);
@@ -58,4 +58,40 @@ test('the saved size is snapped, rounded to whole percents and inside the limits
   assert.equal(settleScale(1.03, limits), 1);
   assert.equal(settleScale(2.5, limits), 2.5);
   assert.equal(settleScale(.5, limits), .5);
+});
+
+// Below a 25 pt menu bar, like a laptop screen.
+const area = { x: 0, y: 25, width: 1440, height: 875 };
+
+test('a pet whose body touches the right edge grows only to the left, feet planted', () => {
+  const start = { x: 1440 - (body.x + body.width), y: 900 - (body.y + body.height), ...DESKTOP_SIZE };
+  const anchor = resizeAnchor(start, body, 1, area);
+  assert.equal(anchor.ax, 1);
+  const grown = anchoredPetBounds(anchor, body, 2);
+  assert.equal(grown.x + (body.x + body.width) * 2, start.x + body.x + body.width);
+  assert.equal(grown.y + (body.y + body.height) * 2, start.y + body.y + body.height);
+  assert.deepEqual([grown.width, grown.height], [560, 640]);
+});
+
+test('the anchor stays put across resizes, so shrinking back returns to the same place', () => {
+  for (const x of [0, 300, 900, 1440 - (body.x + body.width)]) {
+    const start = { x, y: 400, ...DESKTOP_SIZE };
+    let bounds = start, scale = 1;
+    for (const next of [1.4, 2.34, 1.7, 1]) { bounds = resizedPetBounds(bounds, scale, next, body, area); scale = next; }
+    assert.ok(Math.abs(bounds.x - start.x) <= 2 && Math.abs(bounds.y - start.y) <= 2, `from x=${x} came back to ${JSON.stringify(bounds)}`);
+    const anchor = resizeAnchor(start, body, 1, area);
+    assert.ok(Math.abs(resizeAnchor(anchoredPetBounds(anchor, body, 2.34), body, 2.34, area).ax - anchor.ax) < .01);
+  }
+});
+
+test('a pinch that ends at its starting size puts the window back exactly', () => {
+  const start = { x: 612, y: 311, ...DESKTOP_SIZE };
+  assert.deepEqual(anchoredPetBounds(resizeAnchor(start, body, 1, area), body, 1), start);
+  const big = { x: 400, y: 120, width: 420, height: 480 };
+  assert.deepEqual(anchoredPetBounds(resizeAnchor(big, body, 1.5, area), body, 1.5), big);
+});
+
+test('a pinch grows only as tall as the room above the feet', () => {
+  const nearTop = resizeAnchor({ x: 600, y: area.y + 60 - body.y, ...DESKTOP_SIZE }, body, 1, area);
+  assert.equal(pinchRoom(nearTop, body, area), (60 + body.height) / body.height);
 });

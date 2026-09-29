@@ -53,10 +53,27 @@ export function desktopDragPosition(start, cursor, area, footprint, scale) {
   return { ...containPet({ x: start.x + dx, y: start.y + dy }, area, footprint, scale), moved: Math.hypot(dx, dy) >= 5 };
 }
 
+// Resizing keeps the feet on the ground and grows away from the nearer screen side, in
+// proportion to where the pet stands. That point never moves, so no size change pushes the pet.
+export function resizeAnchor(bounds, footprint, scale, area) {
+  const left = bounds.x + footprint.x * scale, width = footprint.width * scale;
+  const ax = clamp((left - area.x) / Math.max(1, area.width - width), 0, 1);
+  return { x: left + ax * width, y: bounds.y + (footprint.y + footprint.height) * scale, ax };
+}
+
+export function anchoredPetBounds(anchor, footprint, scale) {
+  return { x: Math.round(anchor.x - (footprint.x + anchor.ax * footprint.width) * scale), y: Math.round(anchor.y - (footprint.y + footprint.height) * scale),
+    width: Math.round(DESKTOP_SIZE.width * scale), height: Math.round(DESKTOP_SIZE.height * scale) };
+}
+
+// The largest size that still fits above the feet, so a pinch never has to push the pet down.
+export function pinchRoom(anchor, footprint, area) {
+  return (anchor.y - area.y) / footprint.height;
+}
+
 export function resizedPetBounds(bounds, previousScale, nextScale, footprint, area) {
-  const center = footprint.x + footprint.width / 2, feet = footprint.y + footprint.height;
-  return { ...containPet({ x: bounds.x + center * (previousScale - nextScale), y: bounds.y + feet * (previousScale - nextScale) }, area, footprint, nextScale),
-    width: Math.round(DESKTOP_SIZE.width * nextScale), height: Math.round(DESKTOP_SIZE.height * nextScale) };
+  const next = anchoredPetBounds(resizeAnchor(bounds, footprint, previousScale, area), footprint, nextScale);
+  return { ...next, ...containPet(next, area, footprint, nextScale) };
 }
 
 export function visibleViewport(bounds, scale, area) {
