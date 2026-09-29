@@ -55,7 +55,7 @@ async page => {
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'eraser mobile overflow');
         await page.getByRole('button', { name: '修好了', exact: true }).click();
       } else {
-        await page.getByRole('button', { name: '用照片真实生成', exact: true }).click();
+        assert(await page.getByRole('group', { name: '生成方式' }).count() === 0, 'manual provider choice remained');
         await page.getByRole('button', { name: '宠物 · 小物', exact: true }).click();
         await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
       }
@@ -105,6 +105,7 @@ async page => {
       await page.getByText('第一次见面 / 留一份小窝', { exact: true }).click();
       for (const [width, height] of [[320, 568], [1440, 900]]) {
         await page.setViewportSize({ width, height });
+        await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `finish overflow at ${width}`);
         await page.getByRole('button', { name: '下载小窝文件', exact: true }).scrollIntoViewIfNeeded();
         await page.locator('.studio-footer').scrollIntoViewIfNeeded();

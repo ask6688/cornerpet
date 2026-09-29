@@ -16,10 +16,11 @@ async page => {
       await page.getByLabel('上传照片', { exact: true }).setInputFiles('tests/samples/pet-cat.png');
       await page.getByAltText('你上传的原始照片', { exact: true }).waitFor();
       await page.waitForFunction(() => [...document.querySelectorAll('.style-picker img')].every(image => image.complete && image.naturalWidth > 0));
-      assert(await page.getByRole('button', { name: '先体验 Demo', exact: true }).getAttribute('aria-pressed') === 'true', 'Demo is not the safe default');
-      await page.getByRole('button', { name: new RegExp(style === 'mochi' ? '糯米小团预置示例' : '口袋毛绒预置示例') }).click();
+      assert(await page.getByRole('group', { name: '生成方式' }).count() === 0 && await page.locator('.generation-note').count() === 0, 'Demo controls appear before creation');
+      await page.getByRole('button', { name: new RegExp(style === 'mochi' ? '糯米小团风格参考' : '口袋毛绒风格参考') }).click();
       await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
       await page.getByRole('button', { name: /给它起个名字/ }).waitFor();
+      assert(await page.locator('.generation-note').innerText().then(text => text.includes('没有配置图片生成 Key')), 'missing no-key disclosure after creation');
       assert(apiCalls === 0, 'Demo called the generation API');
       assert(await page.locator('.generation-result-note').innerText().then(text => text.includes('并非根据你的照片生成')), 'Demo provenance missing');
       assert(await page.locator('.image-pet').count() === 1, 'Demo image has no preview');
@@ -56,7 +57,7 @@ async page => {
         const originalAsset = await page.locator('.image-pet-face > image').getAttribute('href');
         for (const phase of ['encode', 'prepare']) {
           await page.getByRole('button', { name: '擦掉多余的部分', exact: true }).click();
-          await page.waitForFunction(() => !document.querySelector('.eraser-apply')?.disabled);
+          await page.waitForFunction(() => document.querySelector('.eraser-canvas canvas')?.width > 0 && !document.querySelector('.eraser-apply')?.disabled);
           await page.evaluate(phase => {
             const canvas = document.querySelector('.eraser-canvas canvas');
             canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
@@ -109,11 +110,11 @@ async page => {
     await page.getByRole('button', { name: '把生活里的它带回来', exact: true }).click();
     await page.getByLabel('上传照片', { exact: true }).setInputFiles('tests/samples/pet-cat.png');
     await page.getByAltText('你上传的原始照片', { exact: true }).waitFor();
-    await page.getByRole('button', { name: '用照片真实生成', exact: true }).click();
+    assert(await page.getByRole('group', { name: '生成方式' }).count() === 0, 'manual provider choice remained');
     await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
     await page.getByRole('alert').waitFor();
     assert(apiCalls === 1, 'real mode did not attempt the adapter');
-    await page.getByRole('button', { name: '先用 Demo 小伙伴继续 →', exact: true }).click();
+    await page.getByRole('button', { name: '使用预置示例继续 →', exact: true }).click();
     await page.getByRole('button', { name: /给它起个名字/ }).waitFor();
     await page.locator('.image-pet[data-motion="showcase"]').waitFor();
     assert(await page.locator('.pet-speech').count() === 0, 'fallback showcase displayed speech');

@@ -27,7 +27,7 @@ try {
     await page.getByRole('button', { name: '把生活里的它带回来', exact: true }).click();
     await page.getByLabel('上传照片', { exact: true }).setInputFiles('tests/samples/pet-cat.png');
     await page.getByAltText('你上传的原始照片', { exact: true }).waitFor();
-    await page.getByRole('button', { name: new RegExp(style === 'mochi' ? '糯米小团预置示例' : '口袋毛绒预置示例') }).click();
+    await page.getByRole('button', { name: new RegExp(style === 'mochi' ? '糯米小团风格参考' : '口袋毛绒风格参考') }).click();
     await page.getByRole('button', { name: /创建我的桌角生物/ }).click();
     await page.getByRole('button', { name: /给它起个名字/ }).click();
     const name = style === 'mochi' ? '糯糯伙伴' : '绒绒伙伴';

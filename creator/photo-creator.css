@@ -111,9 +111,6 @@
 @keyframes off-to-the-corner { 0% { transform: translate(0, 0) scale(1); } 40% { transform: translate(0, -14px) scale(1.02); } 100% { transform: translate(20px, -8px) scale(.88); opacity: .72; } }
 @media (prefers-reduced-motion: reduce) { .travel-stage.is-departing > .pet-3d, .travel-stage.is-departing > .image-pet { animation: none; } }
 
-.generation-provider { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.generation-provider button { padding: 7px 11px; border: 1px solid #DBCEBC; border-radius: 99px; color: #957A62; background: transparent; font-size: 10px; }
-.generation-provider button[aria-pressed=true] { color: #6F5947; border-color: #AC9278; background: #EEE6D8; }
 .generation-result-note { border-left: 2px solid #B9B99C; padding: 9px 12px; color: #8B7865; font-size: 11px; line-height: 1.8; background: #EFEBDE80; }
 .photo-error button { display: block; border: 0; background: transparent; color: #805A42; padding: 9px 0 0; text-decoration: underline; text-underline-offset: 3px; font-size: 12px; }
 .photo-preview > .pet-reaction-controls { margin-top: 16px; }
@@ -136,7 +133,6 @@
   .photo-mode-options svg { width: 26px; height: 26px; }
   .style-picker { margin-top: 7px; }
   .style-picker button { padding-block: 4px; }
-  .generation-provider { margin-top: 7px; }
   .generation-note { margin-block: 7px; }
   .generation-result-note { margin-block: 7px; padding-block: 5px; }
   .photo-editor:has(.generation-result-note) .generation-note { display: none; }
@@ -185,7 +181,6 @@
   .style-picker button { padding-block: 3px; }
   .style-picker small { display: none; }
   .style-picker img { height: 32px; width: 30px; }
-  .generation-provider { margin-top: 6px; }
   .generation-note { margin-block: 6px; }
   .generation-result-note { margin-block: 6px; padding-block: 4px; font-size: 10px; }
   .photo-editor:has(.generation-result-note) .generation-note { display: none; }
