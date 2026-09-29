@@ -2,11 +2,20 @@ import { useEffect, useRef, useState, type PointerEvent, type CSSProperties, typ
 import { createRoot } from 'react-dom/client';
 import { PetRenderer } from '../shared/PetRenderer';
 import { createPetStateMachine } from '../shared/pet-state.mjs';
-import { PET } from '../shared/pet-config.mjs';
+import { DESKTOP_SCALE_LIMITS, PET } from '../shared/pet-config.mjs';
 import { usePetInteraction } from '../shared/usePetInteraction';
-import { DEFAULT_FOOTPRINT, DESKTOP_SIZE, bubblePlacement, imageFootprint, validFootprint } from './layout.mjs';
+import { DEFAULT_FOOTPRINT, DESKTOP_SIZE, bubblePlacement, imageFootprint, pinchDisplay, pinchStep, settleScale, validFootprint } from './layout.mjs';
 import './style.css';
 type Rect = { x: number; y: number; width: number; height: number };
+type Limits = { min: number; max: number };
+type Pinch = { raw: number; limits: Limits; frame: number; settle?: ReturnType<typeof setTimeout> };
+const RESIZE_HINT = '想换个大小？在我身上双指捏一捏，或者右键我～';
+
+function resizeLabel(display: ReturnType<typeof pinchDisplay>) {
+  if (display.edge === 'max') return '已经最大啦';
+  if (display.edge === 'min') return '已经最小啦';
+  return display.snapped ? '刚刚好' : `${Math.round(display.scale * 100)}%`;
+}
 
 function DesktopPet() {
   const [config, setConfig] = useState<typeof PET | null>(null);
@@ -37,6 +46,68 @@ function DesktopPet() {
     return () => observer.disconnect();
   }, []);
   const pressed = useRef(false);
+  const [resizeNote, setResizeNote] = useState('');
+  const [hinting, setHinting] = useState(false);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const viewScale = useRef(1);
+  const limits = useRef<Limits>({ min: DESKTOP_SCALE_LIMITS.min, max: DESKTOP_SCALE_LIMITS.max });
+  const pinch = useRef<Pinch | null>(null);
+  const commitPinch = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => { viewScale.current = view.scale; }, [view.scale]);
+  useEffect(() => window.cornerpet.onResizeHint(() => { clearTimeout(hintTimer.current); setHinting(true); }), []);
+  useEffect(() => {
+    window.cornerpet.getScaleOptions().then(options => { limits.current = { min: options.min, max: options.max }; }).catch(() => {});
+    function show(text: string, linger = false) {
+      clearTimeout(noteTimer.current);
+      setResizeNote(text);
+      if (linger) noteTimer.current = setTimeout(() => setResizeNote(''), 1200);
+    }
+    async function commit(gesture: Pinch) {
+      if (pinch.current !== gesture) return;
+      pinch.current = null;
+      clearTimeout(gesture.settle);
+      cancelAnimationFrame(gesture.frame);
+      try {
+        const saved = await window.cornerpet.resizeCommit(settleScale(gesture.raw, gesture.limits));
+        show(resizeLabel(pinchDisplay(saved, gesture.limits)), true);
+      } catch {
+        await window.cornerpet.resizeCancel().catch(() => {});
+        show('大小暂时没能记住，再捏一下试试', true);
+      }
+    }
+    commitPinch.current = async () => { if (pinch.current) await commit(pinch.current); };
+    function onWheel(event: WheelEvent) {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      if (pressed.current) return;
+      if (!document.hasFocus()) window.cornerpet.focusPet();
+      let gesture = pinch.current;
+      if (!gesture) {
+        const started: Pinch = { raw: viewScale.current, limits: limits.current, frame: 0 };
+        gesture = pinch.current = started;
+        setHinting(false);
+        window.cornerpet.getScaleOptions().then(options => {
+          limits.current = { min: options.min, max: options.max };
+          if (pinch.current !== started) return;
+          started.limits = limits.current;
+          started.raw = Math.min(options.max, Math.max(options.min, started.raw));
+        }).catch(() => {});
+      }
+      const current = gesture;
+      current.raw = pinchStep(current.raw, event.deltaY, current.limits);
+      show(resizeLabel(pinchDisplay(current.raw, current.limits)));
+      // Resize the native window at most once per frame.
+      if (!current.frame) current.frame = requestAnimationFrame(() => {
+        current.frame = 0;
+        void window.cornerpet.resizePreview(pinchDisplay(current.raw, current.limits).scale).catch(() => {});
+      });
+      clearTimeout(current.settle);
+      current.settle = setTimeout(() => void commit(current), 400);
+    }
+    addEventListener('wheel', onWheel, { passive: false });
+    return () => { removeEventListener('wheel', onWheel); clearTimeout(noteTimer.current); clearTimeout(hintTimer.current); };
+  }, []);
   useEffect(() => {
     const unsubscribe = window.cornerpet.onView(setView);
     window.cornerpet.getView().then(setView).catch(() => setError('位置暂时没能准备好'));
@@ -83,22 +154,29 @@ function DesktopPet() {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     pressed.current = true;
-    try { await window.cornerpet.startDrag(); }
+    try {
+      // Saving a size ends any drag, so a pinch still settling is saved before this one begins.
+      await commitPinch.current();
+      await window.cornerpet.startDrag();
+    }
     catch { pressed.current = false; setError('拖动暂时不可用'); }
   }
   async function end(event: PointerEvent<HTMLDivElement>, cancelled = false) {
     if (!pressed.current) return;
     pressed.current = false;
+    clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHinting(false), 3000);
     try {
       const moved = await window.cornerpet.endDrag();
       if (!moved && !cancelled) greet();
     } catch { setError('请重新打开桌角生物'); }
     if (event.currentTarget?.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
+  const speechText = error || resizeNote || (hinting ? RESIZE_HINT : '') || message;
   const bubble = bubblePlacement(footprint, view.viewport, speechHeight);
   return <main className="desktop-pet" data-state={behavior.state} style={{ transform: `translate(${view.offset.x}px, ${view.offset.y}px) scale(${view.scale})` }}>
-    <div ref={speech} className={`pet-bubble${message || error ? ' visible' : ''}${bubble.below ? ' below' : ''}`} style={{ left: bubble.x, top: bubble.y, width: bubble.width, '--tail-x': `${bubble.tail}px` } as CSSProperties} role="status">{error || message}</div>
-    {config && <div className="pet-grab" role="button" tabIndex={0} aria-label={`${config.name}：拖动移动，点击打招呼，右键调整大小或隐藏`}
+    <div ref={speech} className={`pet-bubble${speechText ? ' visible' : ''}${bubble.below ? ' below' : ''}`} style={{ left: bubble.x, top: bubble.y, width: bubble.width, '--tail-x': `${bubble.tail}px` } as CSSProperties} role="status">{speechText}</div>
+    {config && <div className="pet-grab" role="button" tabIndex={0} aria-label={`${config.name}：拖动移动，点击打招呼，双指捏合或右键调整大小`}
       onPointerDown={start} onPointerUp={end} onPointerCancel={e => end(e, true)}
       onLostPointerCapture={e => end(e, true)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); greet(); } }}
