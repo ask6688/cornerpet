@@ -1,0 +1,105 @@
+// Run after `npm run pack:mac`:
+//   CORNERPET_APP=release/mac-arm64/CornerPet.app/Contents/MacOS/CornerPet PLAYWRIGHT_MODULE=… node tests/pinch-resize.desktop.mjs
+// Uses a throwaway data folder, so an installed CornerPet can keep running and its pet is never touched.
+import assert from 'node:assert/strict';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { PET, parsePetPackage, serializePetPackage } from '../shared/pet-config.mjs';
+const { _electron } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright');
+const executablePath = process.env.CORNERPET_APP;
+assert.ok(executablePath, 'Set CORNERPET_APP to the packaged executable');
+const data = await mkdtemp(path.join(tmpdir(), 'cornerpet-pinch-'));
+const files = { pet: path.join(data, 'last-pet.cornerpet'), hint: path.join(data, 'resize-hint.json') };
+// Electron-based editors export this, and it would start the app as plain Node.
+const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'ELECTRON_RUN_AS_NODE'));
+// One focused two-finger pinch recorded on macOS 15.6 / Electron 44 (≈ ×2.34).
+const recorded = [-2.239, -3.707, -5.912, -7.036, -7.794, -7.826, -7.729, -7.024, -6.384, -5.953, -5.576, -4.863, -4.385, -3.650, -2.904, -1.889, -0.200];
+let app;
+try {
+  await writeFile(files.pet, serializePetPackage(PET));
+  await writeFile(files.hint, JSON.stringify({ shown: 0, learned: false }));
+  app = await _electron.launch({ executablePath, args: [`--user-data-dir=${data}`], env });
+  const page = await app.firstWindow();
+  await page.locator('.pet-grab').waitFor();
+  const pinch = deltas => page.evaluate(async list => {
+    for (const deltaY of list) {
+      window.dispatchEvent(new WheelEvent('wheel', { ctrlKey: true, deltaY, cancelable: true }));
+      await new Promise(resolve => setTimeout(resolve, 16));
+    }
+  }, deltas);
+  const says = text => page.waitForFunction(value => document.querySelector('.pet-bubble')?.textContent === value, text);
+  // waitForFunction does not await a returned Promise, so bridge calls are polled from here.
+  const until = async (probe, label) => {
+    for (const end = Date.now() + 5000; !(await probe());) {
+      if (Date.now() > end) throw new Error('Timed out waiting for ' + label);
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  };
+  const saved = scale => until(async () => (await page.evaluate(() => window.cornerpet.getConfig())).scale === scale, 'saved scale ' + scale);
+  const petWidth = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(window => !window.webContents.getURL().includes('panel=size')).getBounds().width);
+  const { max } = await page.evaluate(() => window.cornerpet.getScaleOptions());
+  assert.ok(max >= 2.34, 'Run on a display with room for 234% (at least 656 × 749 pt of work area)');
+
+  // A recorded pinch grows the pet live, then saves once the fingers stop.
+  await pinch(recorded);
+  await says('234%');
+  await saved(2.34);
+  assert.equal(await petWidth(), Math.round(280 * 2.34));
+  assert.equal(parsePetPackage(await readFile(files.pet, 'utf8')).scale, 2.34);
+  assert.deepEqual(JSON.parse(await readFile(files.hint, 'utf8')), { shown: 0, learned: true });
+
+  // Pinching back near 100% lands on exactly 100%.
+  await pinch(Array(10).fill(8.5));
+  await says('刚刚好');
+  await saved(1);
+
+  // Coarse unfocused-style bursts are bounded: e^0.40 ≈ 1.49, no jump to a limit.
+  await pinch([-4, -59.786, -287.393, -398.399]);
+  await saved(1.49);
+
+  // The limits stop the pet and it says so.
+  await pinch(Array(60).fill(-12));
+  await says('已经最大啦');
+  await saved(max);
+  await pinch(Array(80).fill(12));
+  await says('已经最小啦');
+  await saved(.5);
+
+  // Ordinary two-finger scrolling leaves the size alone.
+  await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: 40, cancelable: true })));
+  await page.waitForTimeout(600);
+  assert.equal((await page.evaluate(() => window.cornerpet.getConfig())).scale, .5);
+
+  // A pinch closes an open custom-size panel and keeps its own preview: .5 × e^0.8 ≈ 1.11.
+  await app.evaluate(({ Menu }) => {
+    const build = Menu.buildFromTemplate;
+    Menu.buildFromTemplate = function (template) { globalThis.lastPetMenu = build.call(this, template); return globalThis.lastPetMenu; };
+  });
+  await page.locator('.pet-grab').click({ button: 'right', force: true });
+  const panelEvent = app.waitForEvent('window');
+  await app.evaluate(() => {
+    const menu = globalThis.lastPetMenu;
+    menu.closePopup();
+    menu.items.find(item => item.label === '调整大小').submenu.items.find(item => item.label === '自定义…').click();
+  });
+  const panel = await panelEvent;
+  await panel.locator('.size-panel').waitFor();
+  await Promise.all([panel.waitForEvent('close'), pinch(Array(10).fill(-8))]);
+  await saved(1.11);
+  assert.equal(await petWidth(), Math.round(280 * 1.11));
+
+  // When the size cannot be saved, the pet returns to its saved size and says so.
+  await chmod(data, 0o500);
+  try {
+    await pinch(Array(10).fill(-8));
+    await says('大小暂时没能记住，再捏一下试试');
+    assert.equal((await page.evaluate(() => window.cornerpet.getConfig())).scale, 1.11);
+    await until(async () => (await page.evaluate(() => window.cornerpet.getView())).scale === 1.11, 'view back at 1.11');
+  } finally { await chmod(data, 0o700); }
+  console.log('pinch resize desktop checks passed');
+} finally {
+  await app?.close().catch(() => {});
+  await chmod(data, 0o700).catch(() => {});
+  await rm(data, { recursive: true, force: true });
+}
