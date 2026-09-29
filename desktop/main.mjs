@@ -27,7 +27,6 @@ const page = pathToFileURL(path.join(directory, '../dist/desktop/index.html')).h
 let petWindow;
 let sizeWindow;
 let renderScale = 1;
-let previewScale;
 // A pinch in progress: the fixed point it grows around and the sizes it may reach.
 let pinch;
 let tray;
@@ -244,7 +243,7 @@ function updateDrag() {
   if (!drag || !petWindow || petWindow.isDestroyed()) return;
   const cursor = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(cursor);
-  const nextScale = Math.min(previewScale ?? launchPet.scale, desktopScaleLimits(display.workArea).max);
+  const nextScale = Math.min(launchPet.scale, desktopScaleLimits(display.workArea).max);
   if (nextScale !== renderScale) {
     renderScale = nextScale;
     petWindow.setSize(Math.round(DESKTOP_SIZE.width * renderScale), Math.round(DESKTOP_SIZE.height * renderScale));
@@ -290,8 +289,30 @@ function sendView() {
 function resizeWindow(previousScale = petWindow.getBounds().width / DESKTOP_SIZE.width) {
   const bounds = visualBounds();
   const display = screen.getDisplayMatching(bounds);
-  renderScale = Math.min(previewScale ?? launchPet.scale, desktopScaleLimits(display.workArea).max);
+  renderScale = Math.min(launchPet.scale, desktopScaleLimits(display.workArea).max);
   placeWindow(resizedPetBounds(bounds, previousScale, renderScale, footprint, displayArea(display)));
+}
+
+// The sizes a resize may reach from here: the display's limits, and no taller than the room above
+// the feet, so resizing never has to push the pet.
+function resizeLimits() {
+  const bounds = visualBounds(), display = screen.getDisplayMatching(bounds), area = displayArea(display);
+  const { min, max } = desktopScaleLimits(display.workArea);
+  const anchor = resizeAnchor(bounds, footprint, renderScale, area);
+  return { anchor, area, min, max: Math.min(max, Math.max(renderScale, pinchRoom(anchor, footprint, area))) };
+}
+
+// The panel lives in its own window, so its saves go through the pet page and come back here.
+const resizeRequests = new Map();
+let resizeRequestId = 0;
+function requestPetResize(request) {
+  if (!petWindow || petWindow.isDestroyed()) return Promise.reject(new Error('小伙伴暂时不在桌面上'));
+  const id = ++resizeRequestId;
+  petWindow.webContents.send('pet:resize-request', { ...request, id });
+  return new Promise((resolve, reject) => {
+    resizeRequests.set(id, { resolve, reject });
+    setTimeout(() => { if (resizeRequests.delete(id)) reject(new Error('大小暂时没能保存，请再试一次')); }, 15_000);
+  });
 }
 
 // After a pinch the window shrinks once, back around the same fixed point.
@@ -308,7 +329,7 @@ function keepOnDisplay() {
   finishDrag();
   const bounds = visualBounds();
   const display = screen.getDisplayMatching(bounds);
-  if (Math.min(previewScale ?? launchPet.scale, desktopScaleLimits(display.workArea).max) !== renderScale) {
+  if (Math.min(launchPet.scale, desktopScaleLimits(display.workArea).max) !== renderScale) {
     resizeWindow(renderScale);
     return;
   }
@@ -327,7 +348,6 @@ async function setPetScale(scale) {
   catch (error) { throw new Error('大小暂时没能保存，请再试一次', { cause: error }); }
   if (request !== importRequest) throw new Error('小伙伴已经换了一只，请重新调整');
   launchPet = next;
-  previewScale = undefined;
   settleWindow();
   updateTray();
   return scale;
@@ -353,10 +373,8 @@ function showSizeWindow() {
   sizeWindow.once('ready-to-show', () => sizeWindow?.show());
   sizeWindow.on('closed', () => {
     sizeWindow = undefined;
-    // A pinch that closed this panel owns the window now.
-    if (pinch) return;
-    previewScale = undefined;
-    if (petWindow && !petWindow.isDestroyed()) resizeWindow(renderScale);
+    // A size the panel previewed and nobody saved goes back to the saved size.
+    if (pinch?.source === 'panel' && petWindow && !petWindow.isDestroyed()) petWindow.webContents.send('pet:resize-request', { cancel: true });
   });
   const url = new URL(page);
   url.searchParams.set('panel', 'size');
@@ -418,32 +436,41 @@ ipcMain.handle('pet:config', event => {
   return launchPet;
 });
 ipcMain.handle('pet:scale', (event, scale) => {
-  if (!trusted(event) && !trusted(event, sizeWindow)) throw new Error('Untrusted sender');
-  return setPetScale(scale);
+  if (trusted(event)) return setPetScale(scale);
+  if (!trusted(event, sizeWindow)) throw new Error('Untrusted sender');
+  // The pet page saves the panel's size, the same way it saves a pinch.
+  return requestPetResize({ scale, commit: true });
+});
+ipcMain.on('pet:resize-result', (event, result) => {
+  if (!trusted(event)) return;
+  const pending = resizeRequests.get(result?.id);
+  if (!pending) return;
+  resizeRequests.delete(result.id);
+  if (Number.isFinite(result.scale)) pending.resolve(result.scale);
+  else pending.reject(new Error(String(result.error || '大小暂时没能保存，请再试一次')));
 });
 ipcMain.handle('pet:scale-options', event => {
   if (!trusted(event) && !trusted(event, sizeWindow)) throw new Error('Untrusted sender');
-  return scaleOptions();
+  const { min, max } = pinch?.limits ?? resizeLimits();
+  return { scale: renderScale, min, max };
 });
 // A pinch grows the window once to the largest size it may reach. The page then scales the pet
 // with CSS around the fixed point, so the native window changes only at the start and the end.
 // The page learns the planned window first and asks for it afterwards: screenX/screenY reach the
 // page a frame after a new size, so it must not have to wait for them.
-ipcMain.handle('pet:resize-begin', event => {
+ipcMain.handle('pet:resize-begin', (event, source = 'pinch') => {
   if (!trusted(event)) throw new Error('Untrusted sender');
   if (drag) return null;
   if (!pinch) {
-    if (sizeWindow && !sizeWindow.isDestroyed()) {
-      previewScale = undefined;
-      sizeWindow.close();
-    }
-    const bounds = visualBounds(), display = screen.getDisplayMatching(bounds), area = displayArea(display);
-    const { min, max } = desktopScaleLimits(display.workArea);
-    const anchor = resizeAnchor(bounds, footprint, renderScale, area);
-    const limits = { min, max: Math.min(max, Math.max(renderScale, pinchRoom(anchor, footprint, area))) };
+    const { anchor, area, min, max } = resizeLimits(), limits = { min, max };
     const planned = anchoredPetBounds(anchor, footprint, limits.max);
     // macOS keeps windows below the menu bar; plan for that so the page knows the real position.
-    pinch = { anchor, limits, frame: { ...planned, y: Math.max(planned.y, area.y) }, expanded: false };
+    pinch = { source: source === 'panel' ? 'panel' : 'pinch', anchor, limits, frame: { ...planned, y: Math.max(planned.y, area.y) }, expanded: false };
+  }
+  // A pinch takes over from the size panel: the panel closes and the pinch keeps the preview.
+  if (source !== 'panel') {
+    pinch.source = 'pinch';
+    if (sizeWindow && !sizeWindow.isDestroyed()) sizeWindow.close();
   }
   return { anchor: pinch.anchor, footprint, limits: pinch.limits, frame: pinch.frame };
 });
@@ -473,12 +500,12 @@ ipcMain.on('pet:focus', event => {
 });
 ipcMain.handle('pet:scale-preview', (event, scale) => {
   if (!sizeWindow || !trusted(event, sizeWindow)) throw new Error('Untrusted sender');
-  const { min, max } = scaleOptions();
+  const { min, max } = pinch?.limits ?? resizeLimits();
   if (!Number.isFinite(scale) || scale < min || scale > max) throw new Error(`大小请在 ${Math.round(min * 100)}%–${Math.round(max * 100)}% 之间`);
   finishDrag();
-  previewScale = scale;
-  resizeWindow(renderScale);
-  return renderScale;
+  // The pet page previews it the way it previews a pinch: the window grows once, then only the pet scales.
+  if (petWindow && !petWindow.isDestroyed()) petWindow.webContents.send('pet:resize-request', { scale });
+  return scale;
 });
 ipcMain.on('pet:scale-close', event => { if (sizeWindow && trusted(event, sizeWindow)) sizeWindow.close(); });
 ipcMain.handle('pet:view', event => {

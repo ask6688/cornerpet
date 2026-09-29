@@ -125,20 +125,45 @@ try {
   await page.waitForTimeout(600);
   assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), .5);
 
-  // A pinch closes an open custom-size panel and keeps its own preview: .5 × e^0.8 ≈ 1.11.
   await app.evaluate(({ Menu }) => {
     const build = Menu.buildFromTemplate;
     Menu.buildFromTemplate = function (template) { globalThis.lastPetMenu = build.call(this, template); return globalThis.lastPetMenu; };
   });
-  await page.locator('.pet-grab').click({ button: 'right', force: true });
-  const panelEvent = app.waitForEvent('window');
-  await app.evaluate(() => {
-    const menu = globalThis.lastPetMenu;
-    menu.closePopup();
-    menu.items.find(item => item.label === '调整大小').submenu.items.find(item => item.label === '自定义…').click();
-  });
-  const panel = await panelEvent;
-  await panel.locator('.size-panel').waitFor();
+  const openSizePanel = async () => {
+    await page.locator('.pet-grab').click({ button: 'right', force: true });
+    const opened = app.waitForEvent('window');
+    await app.evaluate(() => {
+      const menu = globalThis.lastPetMenu;
+      menu.closePopup();
+      menu.items.find(item => item.label === '调整大小').submenu.items.find(item => item.label === '自定义…').click();
+    });
+    const panel = await opened;
+    await panel.locator('.size-panel').waitFor();
+    await panel.waitForFunction(() => !document.querySelector('input[type=range]').disabled);
+    return panel;
+  };
+  // Log every rendered frame; the returned check proves each one kept the pet's fixed point in place.
+  const watchFrames = async () => {
+    await app.evaluate(() => { globalThis.boundsLog = []; });
+    await page.evaluate(() => {
+      const pet = document.querySelector('.desktop-pet');
+      window.frameLog = [];
+      const tick = () => { window.frameLog.push({ t: Date.now(), w: innerWidth, tf: pet.style.transform }); if (window.frameLog.length < 900) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    });
+    return async (rest, fixed) => {
+      const placed = [{ t: 0, ...rest }, ...await app.evaluate(() => globalThis.boundsLog)];
+      for (const frame of await page.evaluate(() => window.frameLog)) {
+        const bounds = placed.filter(entry => entry.t <= frame.t && Math.abs(entry.width - frame.w) <= 1).at(-1);
+        const [, x, y, scale] = frame.tf.match(/translate\(([-\d.e]+)px, ([-\d.e]+)px\) scale\(([-\d.e]+)\)/).map(Number);
+        const pointX = bounds.x + x + (body.x + fixed.ax * body.width) * scale, pointY = bounds.y + y + (body.y + body.height) * scale;
+        assert.ok(Math.abs(pointX - fixed.x) <= 2 && Math.abs(pointY - fixed.y) <= 2, `a frame drew the fixed point at (${pointX.toFixed(1)}, ${pointY.toFixed(1)}) instead of (${fixed.x.toFixed(1)}, ${fixed.y.toFixed(1)}): ${JSON.stringify(frame)}`);
+      }
+    };
+  };
+
+  // A pinch closes an open custom-size panel and keeps its own preview: .5 × e^0.8 ≈ 1.11.
+  const panel = await openSizePanel();
   await Promise.all([panel.waitForEvent('close'), pinch(Array(10).fill(-8))]);
   await saved(1.11);
   assert.equal(await petWidth(), Math.round(280 * 1.11));
@@ -161,26 +186,14 @@ try {
   // (whose new position the page learns a frame late), the pet's fixed point stays put on screen.
   await page.waitForTimeout(700);
   const rest = await petBounds(), fixed = resizeAnchor(rest, body, 1.95, area);
-  await app.evaluate(() => { globalThis.boundsLog = []; });
-  await page.evaluate(() => {
-    const pet = document.querySelector('.desktop-pet');
-    window.frameLog = [];
-    const tick = () => { window.frameLog.push({ t: Date.now(), w: innerWidth, tf: pet.style.transform }); if (window.frameLog.length < 900) requestAnimationFrame(tick); };
-    requestAnimationFrame(tick);
-  });
+  const pinchFrames = await watchFrames();
   await pinch(Array(4).fill(8));
   await saved(1.42);
   await page.waitForTimeout(700);
   await pinch(Array(4).fill(8));
   await saved(1);
   await page.waitForTimeout(700);
-  const placed = [{ t: 0, ...rest }, ...await app.evaluate(() => globalThis.boundsLog)];
-  for (const frame of await page.evaluate(() => window.frameLog)) {
-    const bounds = placed.filter(entry => entry.t <= frame.t && Math.abs(entry.width - frame.w) <= 1).at(-1);
-    const [, x, y, scale] = frame.tf.match(/translate\(([-\d.e]+)px, ([-\d.e]+)px\) scale\(([-\d.e]+)\)/).map(Number);
-    const pointX = bounds.x + x + (body.x + fixed.ax * body.width) * scale, pointY = bounds.y + y + (body.y + body.height) * scale;
-    assert.ok(Math.abs(pointX - fixed.x) <= 2 && Math.abs(pointY - fixed.y) <= 2, `a frame drew the fixed point at (${pointX.toFixed(1)}, ${pointY.toFixed(1)}) instead of (${fixed.x.toFixed(1)}, ${fixed.y.toFixed(1)}): ${JSON.stringify(frame)}`);
-  }
+  await pinchFrames(rest, fixed);
 
   // Real drags show the hint on the first three, even though this pet has been resized many
   // times; the fourth drag is quiet.
@@ -202,13 +215,36 @@ try {
     await until(async () => (await page.locator('.pet-bubble').textContent()) !== hint, 'the hint to fade after drag ' + drag);
   }
 
+  // The custom-size panel previews like a pinch: the window grows once, the slider only rescales
+  // the pet around the same fixed point, and saving shrinks it once. Panel values do not snap.
+  await page.waitForTimeout(700);
+  const panelRest = await petBounds(), panelFixed = resizeAnchor(panelRest, body, 1, area), resizesBefore2 = await nativeResizes();
+  const panelFrames = await watchFrames();
+  let sizePanel = await openSizePanel();
+  for (const value of ['120', '150', '180', '103']) { await sizePanel.getByRole('slider').fill(value); await page.waitForTimeout(80); }
+  assert.equal(await nativeResizes() - resizesBefore2, 1, 'previewing in the panel grows the window once');
+  await Promise.all([sizePanel.waitForEvent('close'), sizePanel.getByRole('button', { name: '就这么大' }).click()]);
+  await saved(1.03);
+  assert.equal(await nativeResizes() - resizesBefore2, 2, 'saving from the panel shrinks the window once');
+  assert.deepEqual(await petBounds(), anchoredPetBounds(panelFixed, body, 1.03));
+  await page.waitForTimeout(300);
+  await panelFrames(panelRest, panelFixed);
+  // Leaving the panel without saving puts the pet back exactly where and how big it was.
+  sizePanel = await openSizePanel();
+  await sizePanel.getByRole('slider').fill('160');
+  await page.waitForTimeout(200);
+  await Promise.all([sizePanel.waitForEvent('close'), sizePanel.getByRole('button', { name: '先这样' }).click()]);
+  await until(async () => (await petBounds()).width === Math.round(280 * 1.03), 'the window back at the saved size');
+  assert.deepEqual(await petBounds(), anchoredPetBounds(panelFixed, body, 1.03));
+  assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), 1.03);
+
   // When the size cannot be saved, the pet returns to its saved size and says so.
   await chmod(data, 0o500);
   try {
     await pinch(Array(10).fill(-8));
     await says('大小暂时没能记住，再捏一下试试');
-    assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), 1);
-    await until(async () => (await page.evaluate(() => window.cornerpet.getView())).scale === 1, 'view back at 1');
+    assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), 1.03);
+    await until(async () => (await page.evaluate(() => window.cornerpet.getView())).scale === 1.03, 'view back at 1.03');
   } finally { await chmod(data, 0o700); }
   console.log('pinch resize desktop checks passed');
 } finally {

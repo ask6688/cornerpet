@@ -8,8 +8,10 @@ declare global {
       onState(callback: (state: PetStateSnapshot) => void): () => void;
       getConfig(): Promise<typeof import('../shared/pet-config.mjs').PET>;
       setScale(scale: number): Promise<number>;
-      resizeBegin(): Promise<{ anchor: { x: number; y: number; ax: number }; footprint: { x: number; y: number; width: number; height: number }; limits: { min: number; max: number }; frame: { x: number; y: number; width: number; height: number } } | null>;
+      resizeBegin(source?: 'pinch' | 'panel'): Promise<{ anchor: { x: number; y: number; ax: number }; footprint: { x: number; y: number; width: number; height: number }; limits: { min: number; max: number }; frame: { x: number; y: number; width: number; height: number } } | null>;
       resizeExpand(): void;
+      resizeResult(result: { id?: number; scale?: number; error?: string }): void;
+      onResizeRequest(callback: (request: { id?: number; scale?: number; commit?: boolean; cancel?: boolean }) => void): () => void;
       resizeCommit(scale: number): Promise<number>;
       resizeCancel(): Promise<number>;
       focusPet(): void;

@@ -9,7 +9,13 @@ contextBridge.exposeInMainWorld('cornerpet', Object.freeze({
   },
   getConfig: () => ipcRenderer.invoke('pet:config'),
   setScale: scale => ipcRenderer.invoke('pet:scale', scale),
-  resizeBegin: () => ipcRenderer.invoke('pet:resize-begin'),
+  resizeBegin: source => ipcRenderer.invoke('pet:resize-begin', source),
+  resizeResult: result => ipcRenderer.send('pet:resize-result', result),
+  onResizeRequest: callback => {
+    const listener = (_event, request) => callback(request);
+    ipcRenderer.on('pet:resize-request', listener);
+    return () => ipcRenderer.removeListener('pet:resize-request', listener);
+  },
   resizeExpand: () => ipcRenderer.send('pet:resize-expand'),
   resizeCommit: scale => ipcRenderer.invoke('pet:resize-commit', scale),
   resizeCancel: () => ipcRenderer.invoke('pet:resize-cancel'),
