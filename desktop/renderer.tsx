@@ -2,11 +2,23 @@ import { useEffect, useRef, useState, type PointerEvent, type CSSProperties, typ
 import { createRoot } from 'react-dom/client';
 import { PetRenderer } from '../shared/PetRenderer';
 import { createPetStateMachine } from '../shared/pet-state.mjs';
-import { PET } from '../shared/pet-config.mjs';
+import { DESKTOP_SCALE_LIMITS, PET } from '../shared/pet-config.mjs';
 import { usePetInteraction } from '../shared/usePetInteraction';
-import { DEFAULT_FOOTPRINT, DESKTOP_SIZE, bubblePlacement, imageFootprint, validFootprint } from './layout.mjs';
+import { DEFAULT_FOOTPRINT, DESKTOP_SIZE, bubblePlacement, imageFootprint, pinchDisplay, pinchStep, settleScale, validFootprint } from './layout.mjs';
 import './style.css';
 type Rect = { x: number; y: number; width: number; height: number };
+type Limits = { min: number; max: number };
+type View = { scale: number; offset: { x: number; y: number }; viewport: Rect };
+type Anchor = { x: number; y: number; ax: number };
+type Pinch = { source: 'pinch' | 'panel'; raw: number; start: number; limits: Limits; begun: Promise<boolean>; done: Promise<void>; finish: () => void; anchor?: Anchor; body?: Rect; frame?: Rect; offset?: View['offset']; ready?: boolean; final?: number; view?: View; settle?: ReturnType<typeof setTimeout> };
+const viewTransform = (view: View) => `translate(${view.offset.x}px, ${view.offset.y}px) scale(${view.scale})`;
+const RESIZE_HINT = '想换个大小？在我身上双指捏一捏，或者右键我～';
+
+function resizeLabel(display: ReturnType<typeof pinchDisplay>) {
+  if (display.edge === 'max') return '已经最大啦';
+  if (display.edge === 'min') return '已经最小啦';
+  return display.snapped ? '刚刚好' : `${Math.round(display.scale * 100)}%`;
+}
 
 function DesktopPet() {
   const [config, setConfig] = useState<typeof PET | null>(null);
@@ -20,6 +32,9 @@ function DesktopPet() {
     return unsubscribe;
   }, []);
   async function greet() {
+    // A click starts a new exchange: the resize hint gives way to the pet's own words.
+    clearTimeout(hintTimer.current);
+    setHinting(false);
     try {
       const next = await window.cornerpet.interact();
       setBehavior(next);
@@ -28,7 +43,7 @@ function DesktopPet() {
   }
   const [error, setError] = useState('');
   const [footprint, setFootprint] = useState<Rect>(DEFAULT_FOOTPRINT);
-  const [view, setView] = useState<{ scale: number; offset: { x: number; y: number }; viewport: Rect }>({ scale: 1, offset: { x: 0, y: 0 }, viewport: { x: 0, y: 0, ...DESKTOP_SIZE } });
+  const [view, setView] = useState<View>({ scale: 1, offset: { x: 0, y: 0 }, viewport: { x: 0, y: 0, ...DESKTOP_SIZE } });
   const speech = useRef<HTMLDivElement>(null);
   const [speechHeight, setSpeechHeight] = useState(38);
   useEffect(() => {
@@ -37,9 +52,200 @@ function DesktopPet() {
     return () => observer.disconnect();
   }, []);
   const pressed = useRef(false);
+  const [resizeNote, setResizeNote] = useState('');
+  const [hinting, setHinting] = useState(false);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const petLayer = useRef<HTMLElement>(null);
+  const viewScale = useRef(1);
+  const limits = useRef<Limits>({ min: DESKTOP_SCALE_LIMITS.min, max: DESKTOP_SCALE_LIMITS.max });
+  const pinch = useRef<Pinch | null>(null);
+  // A pinch being saved keeps the layout until the window has shrunk back around its fixed point.
+  const settling = useRef<Pinch | null>(null);
+  const layoutResize = useRef<() => void>(() => {});
+  const commitPinch = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => { viewScale.current = view.scale; }, [view.scale]);
+  useEffect(() => window.cornerpet.onResizeHint(() => {
+    clearTimeout(hintTimer.current);
+    setHinting(true);
+    // A quick flick is recognised only as the drag ends; the hint must still fade.
+    if (!pressed.current) hintTimer.current = setTimeout(() => setHinting(false), 3000);
+  }), []);
   useEffect(() => {
-    const unsubscribe = window.cornerpet.onView(setView);
-    window.cornerpet.getView().then(setView).catch(() => setError('位置暂时没能准备好'));
+    window.cornerpet.getScaleOptions().then(options => { limits.current = { min: options.min, max: options.max }; }).catch(() => {});
+    function show(text: string, linger = false) {
+      clearTimeout(noteTimer.current);
+      setResizeNote(text);
+      if (linger) noteTimer.current = setTimeout(() => setResizeNote(''), 1200);
+    }
+    // A pinch snaps near 100%; a size typed or slid in the panel is taken as it is.
+    const shownScale = (gesture: Pinch) => gesture.source === 'panel' ? gesture.raw : pinchDisplay(gesture.raw, gesture.limits).scale;
+    const labelFor = (gesture: Pinch, scale: number) => gesture.source === 'panel' ? `${Math.round(scale * 100)}%` : resizeLabel(pinchDisplay(scale, gesture.limits));
+    // Place the pet around the pinch's fixed point inside the grown window. Only the window's size
+    // is trusted to match the frame being drawn (screenX/screenY arrive a frame late), so the
+    // position comes from the plan and nothing moves until the window really has the planned size.
+    function layout() {
+      const gesture = pinch.current ?? settling.current;
+      if (!gesture?.ready || !gesture.anchor || !gesture.body || !gesture.frame || !petLayer.current) return;
+      if (Math.abs(innerWidth - gesture.frame.width) > 1) return;
+      const { anchor, body, frame } = gesture, scale = gesture.final ?? shownScale(gesture);
+      const x = anchor.x - (body.x + anchor.ax * body.width) * scale - frame.x + (gesture.offset?.x ?? 0);
+      const y = anchor.y - (body.y + body.height) * scale - frame.y + (gesture.offset?.y ?? 0);
+      petLayer.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    }
+    layoutResize.current = layout;
+    // Once the window has shrunk to the final size, the pet fills it again; then the main
+    // process's view takes the layout back.
+    function release(gesture: Pinch) {
+      if (settling.current !== gesture || gesture.final === undefined) return;
+      settling.current = null;
+      gesture.finish();
+      // The next gesture may start before React renders the new view, so it must see this size now.
+      viewScale.current = gesture.view?.scale ?? gesture.final;
+      // Main's settled view includes the offset macOS imposes near the menu bar.
+      if (gesture.view) {
+        if (petLayer.current) petLayer.current.style.transform = viewTransform(gesture.view);
+        setView(gesture.view);
+        return;
+      }
+      if (petLayer.current) petLayer.current.style.transform = `translate(0px, 0px) scale(${gesture.final})`;
+      window.cornerpet.getView().then(value => {
+        if (pinch.current || settling.current) return;
+        if (petLayer.current) petLayer.current.style.transform = viewTransform(value);
+        setView(value);
+      }).catch(() => {});
+    }
+    const settled = (gesture: Pinch) => gesture.final !== undefined && Math.abs(innerWidth - Math.round(DESKTOP_SIZE.width * (gesture.view?.scale ?? gesture.final))) <= 1;
+    function onResize() {
+      layout();
+      if (settling.current && settled(settling.current)) release(settling.current);
+    }
+    // Pinches and the size panel share one gesture: the window grows once, the pet scales inside it.
+    function startGesture(source: Pinch['source']) {
+      const started: Pinch = { source, raw: viewScale.current, start: viewScale.current, limits: limits.current, begun: Promise.resolve(false), done: Promise.resolve(), finish: () => {} };
+      started.done = new Promise(resolve => { started.finish = resolve; });
+      started.begun = window.cornerpet.resizeBegin(source).then(async reply => {
+        if (!reply) return false;
+        started.anchor = reply.anchor;
+        started.body = reply.footprint;
+        started.limits = limits.current = reply.limits;
+        started.frame = reply.frame;
+        // Main knows the size the window really has; steps taken before this reply keep their ratio.
+        if (Math.abs(reply.scale - started.start) > .001) {
+          started.raw *= reply.scale / started.start;
+          started.start = reply.scale;
+        }
+        started.raw = Math.min(reply.limits.max, Math.max(reply.limits.min, started.raw));
+        const offset = await window.cornerpet.resizeExpand();
+        if (!offset) return false;
+        started.offset = offset;
+        started.ready = true;
+        layout();
+        return true;
+      }).catch(() => false);
+      pinch.current = started;
+      setHinting(false);
+      return started;
+    }
+    function settleAfter(gesture: Pinch) {
+      layout();
+      if (settled(gesture)) release(gesture);
+      else setTimeout(() => release(gesture), 600);
+    }
+    async function commit(gesture: Pinch): Promise<{ scale?: number; error?: string }> {
+      if (pinch.current !== gesture) return { error: '小伙伴正在换大小，请再试一次' };
+      pinch.current = null;
+      clearTimeout(gesture.settle);
+      settling.current = gesture;
+      if (!(await gesture.begun)) {
+        // A drag owned the window, so nothing grew and nothing is saved.
+        show('');
+        settling.current = null;
+        gesture.finish();
+        return { error: '小伙伴正被拖着，放下后再试' };
+      }
+      // Known before the window shrinks, so the frame after it is already laid out.
+      gesture.final = gesture.source === 'panel' ? Math.min(gesture.limits.max, Math.max(gesture.limits.min, Math.round(gesture.raw * 100) / 100)) : settleScale(gesture.raw, gesture.limits);
+      let result: { scale?: number; error?: string };
+      try {
+        ({ scale: gesture.final, view: gesture.view } = await window.cornerpet.resizeCommit(gesture.final));
+        show(labelFor(gesture, gesture.view?.scale ?? gesture.final), true);
+        result = { scale: gesture.final };
+      } catch (reason) {
+        const restored = await window.cornerpet.resizeCancel().catch(() => undefined);
+        gesture.final = restored?.scale ?? gesture.start;
+        gesture.view = restored?.view;
+        show('大小暂时没能记住，再捏一下试试', true);
+        result = { error: reason instanceof Error ? reason.message : '大小暂时没能保存，请再试一次' };
+      }
+      settleAfter(gesture);
+      return result;
+    }
+    async function cancel(gesture: Pinch) {
+      if (pinch.current !== gesture) return;
+      pinch.current = null;
+      clearTimeout(gesture.settle);
+      settling.current = gesture;
+      if (!(await gesture.begun)) { settling.current = null; gesture.finish(); return; }
+      const restored = await window.cornerpet.resizeCancel().catch(() => undefined);
+      gesture.final = restored?.scale ?? gesture.start;
+      gesture.view = restored?.view;
+      show('');
+      settleAfter(gesture);
+    }
+    // Saving a size ends any drag, so a pinch still settling is saved before a new drag begins.
+    commitPinch.current = async () => { if (pinch.current?.source === 'pinch') await commit(pinch.current); };
+    function onWheel(event: WheelEvent) {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      if (pressed.current || settling.current) return;
+      if (!document.hasFocus()) window.cornerpet.focusPet();
+      let gesture = pinch.current;
+      if (gesture?.source === 'panel') {
+        // A pinch takes over from the size panel: the panel closes, this pinch keeps the preview.
+        gesture.source = 'pinch';
+        window.cornerpet.resizeTakeover();
+      }
+      gesture ??= startGesture('pinch');
+      const current = gesture;
+      current.raw = pinchStep(current.raw, event.deltaY, current.limits);
+      show(labelFor(current, current.raw));
+      layout();
+      clearTimeout(current.settle);
+      current.settle = setTimeout(() => void commit(current), 400);
+    }
+    // The size panel previews, saves and cancels through the same gesture.
+    const stopRequests = window.cornerpet.onResizeRequest(async request => {
+      if (request.cancel) {
+        if (pinch.current && (request.force || pinch.current.source === 'panel')) await cancel(pinch.current);
+        return;
+      }
+      if (settling.current) {
+        if (request.id) window.cornerpet.resizeResult({ id: request.id, error: '小伙伴还在换大小，请再点一次' });
+        return;
+      }
+      const gesture = pinch.current ?? startGesture('panel');
+      if (Number.isFinite(request.scale)) gesture.raw = Math.min(gesture.limits.max, Math.max(gesture.limits.min, request.scale!));
+      if (!request.commit) {
+        show(labelFor(gesture, gesture.raw));
+        layout();
+        return;
+      }
+      window.cornerpet.resizeResult({ id: request.id, ...await commit(gesture) });
+    });
+    addEventListener('wheel', onWheel, { passive: false });
+    addEventListener('resize', onResize);
+    return () => { removeEventListener('wheel', onWheel); removeEventListener('resize', onResize); stopRequests(); clearTimeout(noteTimer.current); clearTimeout(hintTimer.current); };
+  }, []);
+  useEffect(() => {
+    // While a pinch owns the layout, the main process's view is ignored; release() fetches it anew.
+    const receive = (value: View) => {
+      const gesture = pinch.current ?? settling.current;
+      if (gesture) { gesture.offset = value.offset; layoutResize.current(); }
+      else setView(value);
+    };
+    const unsubscribe = window.cornerpet.onView(receive);
+    window.cornerpet.getView().then(receive).catch(() => setError('位置暂时没能准备好'));
     window.cornerpet.getConfig().then(value => {
       setConfig(value);
       document.title = `${value.name} · 桌角生物`;
@@ -81,24 +287,36 @@ function DesktopPet() {
   }, [config]);
   async function start(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
+    // While the size panel previews a size, the pet holds still.
+    if (pinch.current?.source === 'panel') return;
     event.currentTarget.setPointerCapture(event.pointerId);
     pressed.current = true;
-    try { await window.cornerpet.startDrag(); }
+    try {
+      await commitPinch.current();
+      // A size still being saved moves the window when it lands, so the drag starts after that.
+      if (settling.current) await settling.current.done;
+      // A quick tap can end while that save is still running; then there is no drag to start.
+      if (!pressed.current) return;
+      await window.cornerpet.startDrag();
+    }
     catch { pressed.current = false; setError('拖动暂时不可用'); }
   }
   async function end(event: PointerEvent<HTMLDivElement>, cancelled = false) {
     if (!pressed.current) return;
     pressed.current = false;
+    clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHinting(false), 3000);
     try {
       const moved = await window.cornerpet.endDrag();
       if (!moved && !cancelled) greet();
     } catch { setError('请重新打开桌角生物'); }
     if (event.currentTarget?.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
+  const speechText = error || resizeNote || (hinting ? RESIZE_HINT : '') || message;
   const bubble = bubblePlacement(footprint, view.viewport, speechHeight);
-  return <main className="desktop-pet" data-state={behavior.state} style={{ transform: `translate(${view.offset.x}px, ${view.offset.y}px) scale(${view.scale})` }}>
-    <div ref={speech} className={`pet-bubble${message || error ? ' visible' : ''}${bubble.below ? ' below' : ''}`} style={{ left: bubble.x, top: bubble.y, width: bubble.width, '--tail-x': `${bubble.tail}px` } as CSSProperties} role="status">{error || message}</div>
-    {config && <div className="pet-grab" role="button" tabIndex={0} aria-label={`${config.name}：拖动移动，点击打招呼，右键调整大小或隐藏`}
+  return <main ref={petLayer} className="desktop-pet" data-state={behavior.state} style={{ transform: viewTransform(view) }}>
+    <div ref={speech} className={`pet-bubble${speechText ? ' visible' : ''}${bubble.below ? ' below' : ''}`} style={{ left: bubble.x, top: bubble.y, width: bubble.width, '--tail-x': `${bubble.tail}px` } as CSSProperties} role="status">{speechText}</div>
+    {config && <div className="pet-grab" role="button" tabIndex={0} aria-label={`${config.name}：拖动移动，点击打招呼，双指捏合或右键调整大小`}
       onPointerDown={start} onPointerUp={end} onPointerCancel={e => end(e, true)}
       onLostPointerCapture={e => end(e, true)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); greet(); } }}

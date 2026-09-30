@@ -50,6 +50,7 @@
       "desktop/layout.mjs",
       "desktop/handoff.mjs",
       "desktop/pet-storage.mjs",
+      "desktop/resize-hint.mjs",
       "desktop/preload.cjs",
       "shared/pet-config.mjs",
       "shared/pet-state.mjs",
