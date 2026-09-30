@@ -237,7 +237,9 @@ try {
   // The custom-size panel previews like a pinch: the window grows once, the slider only rescales
   // the pet around the same fixed point, and saving shrinks it once. Panel values do not snap.
   await page.waitForTimeout(700);
-  const panelRest = await petBounds(), panelFixed = resizeAnchor(panelRest, body, 1, area), resizesBefore2 = await nativeResizes();
+  const panelRest = await petBounds(), panelView = await page.evaluate(() => window.cornerpet.getView());
+  const panelFixed = resizeAnchor({ ...panelRest, x: panelRest.x + panelView.offset.x, y: panelRest.y + panelView.offset.y }, body, 1, area);
+  const resizesBefore2 = await nativeResizes();
   const panelFrames = await watchFrames();
   let sizePanel = await openSizePanel();
   for (const value of ['120', '150', '180', '103']) { await sizePanel.getByRole('slider').fill(value); await page.waitForTimeout(80); }
