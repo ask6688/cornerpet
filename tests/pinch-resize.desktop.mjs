@@ -68,11 +68,21 @@ try {
     const pet = BrowserWindow.getAllWindows()[0], setBounds = pet.setBounds.bind(pet), cursor = screen.getCursorScreenPoint.bind(screen);
     globalThis.nativeResizes = 0;
     globalThis.boundsLog = [];
-    pet.setBounds = (...args) => { globalThis.nativeResizes++; globalThis.boundsLog.push({ t: Date.now(), ...args[0] }); return setBounds(...args); };
+    // Log where macOS actually put the window: near the menu bar it keeps it lower than asked.
+    pet.setBounds = (...args) => { globalThis.nativeResizes++; const result = setBounds(...args); globalThis.boundsLog.push({ t: Date.now(), ...pet.getBounds() }); return result; };
     globalThis.cursorShift = 0;
-    screen.getCursorScreenPoint = () => { const point = cursor(); return { x: point.x + globalThis.cursorShift, y: point.y }; };
+    globalThis.cursorShiftY = 0;
+    screen.getCursorScreenPoint = () => { const point = cursor(); return { x: point.x + globalThis.cursorShift, y: point.y + globalThis.cursorShiftY }; };
+    // Slow every save down, so a drag or a second pinch can reliably land while one is running.
+    const files = process.getBuiltinModule('fs/promises'), rename = files.rename;
+    globalThis.slowSaves = on => {
+      files.rename = on ? async (...args) => { await new Promise(resolve => setTimeout(resolve, 700)); return rename(...args); } : rename;
+      process.getBuiltinModule('module').syncBuiltinESMExports();
+    };
   });
   const nativeResizes = () => app.evaluate(() => globalThis.nativeResizes);
+  // The pet sleeps (and keeps quiet) once the Mac has been idle for 10 minutes; keep it awake.
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.getSystemIdleTime = () => 0; });
   const area = await app.evaluate(({ BrowserWindow, screen }) => {
     const display = screen.getDisplayMatching(BrowserWindow.getAllWindows()[0].getBounds()), top = Math.max(display.bounds.y, display.workArea.y);
     return { ...display.bounds, y: top, height: display.bounds.y + display.bounds.height - top };
@@ -238,13 +248,90 @@ try {
   assert.deepEqual(await petBounds(), anchoredPetBounds(panelFixed, body, 1.03));
   assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), 1.03);
 
+  const moveGrab = async () => { const grab = await page.locator('.pet-grab').boundingBox(); await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2); };
+  const dragBy = async (dx, dy) => {
+    await moveGrab();
+    await page.mouse.down();
+    await app.evaluate((_, [x, y]) => { globalThis.cursorShift += x; globalThis.cursorShiftY += y; }, [dx, dy]);
+    await page.waitForTimeout(150);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+  };
+  const choosePreset = label => app.evaluate((_, name) => globalThis.lastPetMenu.items.find(item => item.label === '调整大小').submenu.items.find(item => item.label === name).click(), label);
+
+  // A preset chosen while the panel previews ends that preview properly: once the panel closes,
+  // the pet is drawn inside its window at the preset size and can be dragged again.
+  sizePanel = await openSizePanel();
+  await sizePanel.getByRole('slider').fill('180');
+  await page.waitForTimeout(250);
+  await choosePreset('刚刚好');
+  await saved(1);
+  await Promise.all([sizePanel.waitForEvent('close'), sizePanel.getByRole('button', { name: '先这样' }).click()]);
+  await until(async () => (await petBounds()).width === 280, 'the window at the preset size');
+  await until(async () => await page.evaluate(() => document.querySelector('.desktop-pet').style.transform) === 'translate(0px, 0px) scale(1)', 'the pet drawn inside its window');
+  const beforeDrag = await petBounds();
+  // Leftwards: the pet stands against the right edge, where the screen stops it.
+  await dragBy(-40, 0);
+  assert.equal((await petBounds()).x, beforeDrag.x - 40, 'the pet can be dragged again');
+
+  // A drag that starts while a pinch is being saved waits for the save, then moves the pet by
+  // the cursor's travel, instead of jumping to where the grown window was.
+  const beforeSlowPinch = await petBounds();
+  await app.evaluate(() => globalThis.slowSaves(true));
+  await pinch(Array(4).fill(-8));
+  await page.waitForTimeout(480);
+  await moveGrab();
+  await page.mouse.down();
+  await saved(1.38);
+  await page.waitForTimeout(300);
+  await app.evaluate(() => { globalThis.cursorShift -= 40; });
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  await app.evaluate(() => globalThis.slowSaves(false));
+  const settledThere = anchoredPetBounds(resizeAnchor(beforeSlowPinch, body, 1, area), body, 1.38), afterDrag = await petBounds();
+  assert.ok(Math.abs(afterDrag.x - settledThere.x + 40) <= 2 && Math.abs(afterDrag.y - settledThere.y) <= 2, `the drag moved the pet from ${JSON.stringify(settledThere)} to ${JSON.stringify(afterDrag)}`);
+
+  // Pinching on straight through a save: the second pinch continues from the first one's size,
+  // so while the fingers only spread the pet is never drawn smaller.
+  await page.waitForTimeout(300);
+  const growFrames = await watchFrames();
+  await app.evaluate(() => globalThis.slowSaves(true));
+  await pinch(Array(3).fill(-6));
+  await page.waitForTimeout(380);
+  await pinch(Array(90).fill(-1));
+  await app.evaluate(() => globalThis.slowSaves(false));
+  await page.waitForTimeout(1800);
+  let drawnBefore = 0;
+  for (const frame of await page.evaluate(() => window.frameLog)) {
+    const drawn = Number(frame.tf.match(/scale\(([-\d.e]+)\)/)[1]);
+    assert.ok(drawn >= drawnBefore - .005, `a spreading pinch drew the pet smaller: ${drawnBefore} → ${drawn}`);
+    drawnBefore = drawn;
+  }
+  void growFrames;
+
+  // Near the menu bar macOS keeps the window lower than asked. The end of a pinch there still
+  // draws the pet in place on every frame.
+  await choosePreset('刚刚好');
+  await saved(1);
+  await page.waitForTimeout(300);
+  await dragBy(0, -3000);
+  await dragBy(0, 20);
+  const nearTop = await petBounds(), nearTopView = await page.evaluate(() => window.cornerpet.getView());
+  assert.ok(nearTopView.offset.y < 0, 'the pet sits with its head under the menu bar');
+  const topFixed = resizeAnchor({ ...nearTop, x: nearTop.x + nearTopView.offset.x, y: nearTop.y + nearTopView.offset.y }, body, 1, area);
+  const topFrames = await watchFrames();
+  await pinch([-3, -3]);
+  await saved(1.06);
+  await page.waitForTimeout(500);
+  await topFrames(nearTop, topFixed);
+
   // When the size cannot be saved, the pet returns to its saved size and says so.
   await chmod(data, 0o500);
   try {
     await pinch(Array(10).fill(-8));
     await says('大小暂时没能记住，再捏一下试试');
-    assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), 1.03);
-    await until(async () => (await page.evaluate(() => window.cornerpet.getView())).scale === 1.03, 'view back at 1.03');
+    assert.equal(await page.evaluate(() => window.cornerpet.getConfig().then(pet => pet.scale)), 1.06);
+    await until(async () => (await page.evaluate(() => window.cornerpet.getView())).scale === 1.06, 'view back at 1.06');
   } finally { await chmod(data, 0o700); }
   console.log('pinch resize desktop checks passed');
 } finally {

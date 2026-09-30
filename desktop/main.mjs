@@ -373,8 +373,9 @@ function showSizeWindow() {
   sizeWindow.once('ready-to-show', () => sizeWindow?.show());
   sizeWindow.on('closed', () => {
     sizeWindow = undefined;
-    // A size the panel previewed and nobody saved goes back to the saved size.
-    if (pinch?.source === 'panel' && petWindow && !petWindow.isDestroyed()) petWindow.webContents.send('pet:resize-request', { cancel: true });
+    // A size the panel previewed and nobody saved goes back to the saved size. Sent every time:
+    // the page's own gesture may be ahead of main, and it ignores this without a panel preview.
+    if (petWindow && !petWindow.isDestroyed()) petWindow.webContents.send('pet:resize-request', { cancel: true });
   });
   const url = new URL(page);
   url.searchParams.set('panel', 'size');
@@ -390,7 +391,8 @@ function companionMenu() {
     { type: 'separator' },
     { label: '调整大小', submenu: [...[[.75, '小小一只'], [1, '刚刚好'], [1.25, '大一点']].map(([scale, label]) => ({
       label, type: 'radio', checked: Math.abs(renderScale - scale) < .01, enabled: scale <= scaleOptions().max,
-      click: () => void setPetScale(scale).catch(error => dialog.showErrorBox('暂时没能记住大小', error.message)),
+      // While a pinch or the panel holds a preview, the pet page ends it with this size.
+      click: () => void (pinch ? requestPetResize({ scale, commit: true }) : setPetScale(scale)).catch(error => dialog.showErrorBox('暂时没能记住大小', error.message)),
     })), { type: 'separator' }, { label: '自定义…', click: showSizeWindow }] },
     { label: petWindow?.isVisible() ? '暂时隐藏' : '恢复显示', click: () => {
       finishDrag(); if (petWindow?.isVisible()) petWindow.hide(); else showPet();
@@ -426,6 +428,8 @@ function finishDrag() {
 
 ipcMain.handle('pet:drag-start', event => {
   if (!trusted(event)) throw new Error('Untrusted sender');
+  // A resize still owns the window; a drag from the grown window would jump once it shrinks.
+  if (pinch) return;
   finishDrag();
   const { x, y } = visualBounds();
   drag = { x, y, cursor: screen.getCursorScreenPoint(), moved: false };
@@ -472,7 +476,13 @@ ipcMain.handle('pet:resize-begin', (event, source = 'pinch') => {
     pinch.source = 'pinch';
     if (sizeWindow && !sizeWindow.isDestroyed()) sizeWindow.close();
   }
-  return { anchor: pinch.anchor, footprint, limits: pinch.limits, frame: pinch.frame };
+  return { scale: renderScale, anchor: pinch.anchor, footprint, limits: pinch.limits, frame: pinch.frame };
+});
+// A pinch over an open panel's preview takes it over; the panel closes without cancelling it.
+ipcMain.on('pet:resize-takeover', event => {
+  if (!trusted(event) || pinch?.source !== 'panel') return;
+  pinch.source = 'pinch';
+  if (sizeWindow && !sizeWindow.isDestroyed()) sizeWindow.close();
 });
 ipcMain.on('pet:resize-expand', event => {
   if (!trusted(event) || !pinch || pinch.expanded) return;
@@ -483,15 +493,17 @@ ipcMain.handle('pet:resize-commit', (event, scale) => {
   if (!trusted(event)) throw new Error('Untrusted sender');
   if (!Number.isFinite(scale)) throw new Error('Invalid pet scale');
   const { min, max } = pinch?.limits ?? scaleOptions();
-  return setPetScale(Math.round(Math.min(max, Math.max(min, scale)) * 100) / 100);
+  // The settled view comes back with the size: near the menu bar it carries the offset macOS imposed.
+  return setPetScale(Math.round(Math.min(max, Math.max(min, scale)) * 100) / 100).then(saved => ({ scale: saved, view: currentView() }));
 });
 ipcMain.handle('pet:resize-cancel', event => {
   if (!trusted(event)) throw new Error('Untrusted sender');
-  if (!pinch) return renderScale;
-  const { anchor } = pinch;
-  pinch = undefined;
-  placeWindow(anchoredPetBounds(anchor, footprint, renderScale));
-  return renderScale;
+  if (pinch) {
+    const { anchor } = pinch;
+    pinch = undefined;
+    placeWindow(anchoredPetBounds(anchor, footprint, renderScale));
+  }
+  return { scale: renderScale, view: currentView() };
 });
 // An unfocused window receives only a few coarse pinch events; taking focus
 // on the first one is the same as the click that starts every drag.

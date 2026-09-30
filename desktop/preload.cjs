@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('cornerpet', Object.freeze({
     return () => ipcRenderer.removeListener('pet:resize-request', listener);
   },
   resizeExpand: () => ipcRenderer.send('pet:resize-expand'),
+  resizeTakeover: () => ipcRenderer.send('pet:resize-takeover'),
   resizeCommit: scale => ipcRenderer.invoke('pet:resize-commit', scale),
   resizeCancel: () => ipcRenderer.invoke('pet:resize-cancel'),
   focusPet: () => ipcRenderer.send('pet:focus'),
