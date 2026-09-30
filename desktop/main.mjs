@@ -219,7 +219,15 @@ function showPet(refresh = false) {
   petWindow.webContents.on('will-navigate', event => event.preventDefault());
   petWindow.webContents.on('will-attach-webview', event => event.preventDefault());
   petWindow.once('ready-to-show', () => petWindow.showInactive());
-  petWindow.on('move', sendView);
+  petWindow.on('move', () => {
+    // macOS can finish clamping a frame after setBounds returns; keep the character
+    // anchored to the planned frame while a pinch owns the larger window.
+    if (pinch?.expanded) {
+      const actual = petWindow.getBounds();
+      contentOffset = { x: pinch.frame.x - actual.x, y: pinch.frame.y - actual.y };
+    }
+    sendView();
+  });
   petWindow.on('show', updateTray);
   petWindow.on('hide', updateTray);
   petWindow.on('blur', finishDrag);
