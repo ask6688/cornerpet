@@ -4,7 +4,7 @@
 
 捏一只软乎乎的小家伙，或把喜欢的照片变成桌角伙伴。给它起个名字，再把它从网页带到 Mac 桌面：你忙的时候它自己发呆，点一点，它就回应你。
 
-**[在线领养一只](https://cornerpet-companion.netlify.app/) · [下载 macOS 桌面版](https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg)**
+**[在线领养一只](https://cornerpet-companion.netlify.app/) · [下载 macOS 桌面版](https://github.com/ask6688/cornerpet/releases/download/v0.2.0/CornerPet-0.2.0-arm64.dmg)**
 
 ## Preview
 
@@ -140,8 +140,6 @@ AI 一方面参与开发过程，辅助代码实现、展示素材制作和多�
 
 **调整桌宠大小：** 在角色身上双指捏合（或按住 ⌃ 滚动滚轮），也可以右键选择「调整大小」。自定义面板支持实时预览；确认后保存，取消则回到原来的大小。角色会尽量以脚底为固定点长大或缩小，靠近屏幕边缘时会限制可用尺寸。前三次拖动时，它会轻声提示这个玩法。
 
-这项调整目前可从源码构建体验；下方 v0.1.0 安装包仍是旧版，尚未包含这次改动。
-
 当前照片风格化的预置 Demo 与上传照片无关；Seedream 接口已接入，但真实照片的生成效果仍待验证，配置 Key 也不等于保证调用成功。任意照片转可旋转 3D 模型尚未实现。桌面版目前面向 Apple Silicon Mac（macOS 13+），使用临时签名，未做 Developer ID 签名、公证或 Intel Mac 验收，首次打开可能看到 Apple 的验证提示（处理方法见 [Try it](#try-it)）。桌面版没有自动更新，有新版本时请下载新版安装包重新安装。
 
 ## Try it
@@ -154,7 +152,7 @@ AI 一方面参与开发过程，辅助代码实现、展示素材制作和多�
 
 桌面版需要 Apple Silicon（M 系列芯片）的 Mac 和 macOS 13 以上；在左上角苹果菜单 →「关于本机」可以查看芯片。Intel Mac 暂不支持。
 
-1. 下载 [macOS 安装包](https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg)（约 128 MB）。
+1. 下载 [macOS 安装包](https://github.com/ask6688/cornerpet/releases/download/v0.2.0/CornerPet-0.2.0-arm64.dmg)（约 128 MB）。
 2. 打开 DMG，把 CornerPet 拖入「应用程序」，再打开 App 一次。
 3. 回到原网页重试「带它去桌面」，按浏览器提示允许打开 App 和连接本机。
 4. 看着同名、同造型的小伙伴来到桌角，点一点，和它打个招呼。
