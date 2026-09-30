@@ -132,26 +132,32 @@ AI 一方面参与开发过程，辅助代码实现、展示素材制作和多�
 
 风格化预留了 Seedream 服务端接口。部署者配置自己的 `ARK_API_KEY` 后，用户仍然只需点击「创建我的桌角生物」，无需选择“真实生成”模式；未配置时会在创建时说明当前使用预置示例。Key 留在服务端，真实生成会将处理后的图片主体发送给图片服务。
 
+**Key 由谁提供：** Key 属于部署网站的人，写在服务端环境变量里，访客在页面上无法填写，桌面 App 也不会调用图片服务。风格化是否走真实生成，以站点服务端配置为准；未配置 Key 或只开放 Demo 时，使用与上传照片无关的预置示例。想用真实生成，请[本地运行并填入你自己的火山方舟 Key](#使用自己的图片生成-api)，调用费用由你的火山方舟账号承担。
+
 ## Current Status
 
 **现在可以完整体验：** DIY 3D、照片本地抠图与修整、命名保存、`.cornerpet` 导出、Web → macOS 交接，以及桌宠的基础互动、睡眠和提醒。桌面安装包已提供下载。
 
-当前照片风格化的预置 Demo 与上传照片无关；Seedream 接口已接入，但真实照片的生成效果仍待验证，配置 Key 也不等于保证调用成功。任意照片转可旋转 3D 模型尚未实现。桌面版目前面向 Apple Silicon Mac，使用临时签名，未做 Developer ID 签名、公证或 Intel Mac 验收。
+当前照片风格化的预置 Demo 与上传照片无关；Seedream 接口已接入，但真实照片的生成效果仍待验证，配置 Key 也不等于保证调用成功。任意照片转可旋转 3D 模型尚未实现。桌面版目前面向 Apple Silicon Mac（macOS 13+），使用临时签名，未做 Developer ID 签名、公证或 Intel Mac 验收，首次打开可能看到 Apple 的验证提示（处理方法见 [Try it](#try-it)）。桌面版没有自动更新，有新版本时请下载新版安装包重新安装。
 
 ## Try it
 
 **[打开在线体验](https://cornerpet-companion.netlify.app/)**，先捏一只角色，或上传照片选择「保留它」。基础体验不需要账号和 API Key。
 
-创建完成后点 **「带它去桌面」**。连接成功，小伙伴会直接出现在桌角；没连上时，页面会说明原因并给出安装入口：
+创建完成后点 **「带它去桌面」**。连接成功，小伙伴会直接出现在桌角；没连上时，页面会说明原因并给出安装入口。
 
-1. 下载 [macOS 安装包](https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg)（Apple Silicon，约 128 MB）。
+### 安装桌面 App
+
+桌面版需要 Apple Silicon（M 系列芯片）的 Mac 和 macOS 13 以上；在左上角苹果菜单 →「关于本机」可以查看芯片。Intel Mac 暂不支持。
+
+1. 下载 [macOS 安装包](https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg)（约 128 MB）。
 2. 打开 DMG，把 CornerPet 拖入「应用程序」，再打开 App 一次。
 3. 回到原网页重试「带它去桌面」，按浏览器提示允许打开 App 和连接本机。
 4. 看着同名、同造型的小伙伴来到桌角，点一点，和它打个招呼。
 
-页面里的「导出角色文件（.cornerpet）」用于留存和导入角色；安装桌面 App 请下载上面的 DMG。
+首次打开若提示无法验证开发者，或 Apple 无法检查是否包含恶意软件，确认安装包来自本仓库的 Release、来源可信且未被篡改后，可在「系统设置 → 隐私与安全性」选择「仍要打开」，再按提示确认。这会为该 App 设置例外，不代表它已通过 Developer ID 签名或公证。若提示「已损坏，无法打开」或「将对你的电脑造成伤害」，请停止安装，不要绕过提示，并到 [Issues](https://github.com/ask6688/cornerpet/issues) 反馈。不同警告的含义可查看 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。
 
-首次打开若提示无法验证开发者，确认下载来源可信后，可在「系统设置 → 隐私与安全性」选择「仍要打开」。若提示 App 已损坏或会损坏电脑，请停止安装。
+App 没有 Dock 图标，打开后菜单栏会出现 `◡`，从那里可以召回、调整大小或退出。页面里的「导出角色文件（.cornerpet）」用于留存和导入角色，不是安装包。
 
 ## Run locally
 
@@ -170,7 +176,9 @@ npm run dev          # http://127.0.0.1:5173/
 npm run desktop      # 构建后启动 Electron
 ```
 
-体验网页一键交接，请先安装上方 DMG，让 macOS 注册 CornerPet 的打开方式。
+体验网页一键交接，请先按 [安装桌面 App](#安装桌面-app) 装好 CornerPet，让 macOS 注册 CornerPet 的打开方式。
+
+部分基于 Electron 的编辑器或 AI 工具的运行环境可能带有 `ELECTRON_RUN_AS_NODE=1`，这会让 Electron 以普通 Node 进程启动，报 `The requested module 'electron' does not provide an export named 'BrowserWindow'`。`npm run desktop` 已自动去掉这个变量；自己直接运行时请用 `env -u ELECTRON_RUN_AS_NODE npx electron .`。
 
 验证与打包：
 
@@ -189,6 +197,8 @@ npm run dist:mac     # Apple Silicon Mac：生成 DMG / ZIP，产物在 release/
 服务端配置 Key 后会自动尝试真实生成；如果调用失败，可以主动改用预置示例。调用可能产生服务商费用。`.env` 已被 Git 忽略，浏览器只能读取配置状态，无法读取 Key。
 
 在线体验站不提供给访客填写 Key 的入口；使用自己的 Key 请本地运行，或在自己的部署平台配置服务端环境变量。Netlify 部署需同时包含 `dist/` 和 `netlify/functions/`；在 Netlify 平台的环境变量中设置 `CORNERPET_DEMO_ONLY=true` 可以只开放预置示例。纯静态部署也能运行基础体验。
+
+公开部署前请注意：站点一旦配置了 Key，所有访客的生成请求都会消耗你的额度。目前只有 Netlify 函数上每个 IP 3 分钟 6 次的限流（见 `netlify/functions/generate-pet.mjs`）。
 
 ## Tech Stack
 
