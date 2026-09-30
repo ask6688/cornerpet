@@ -1,18 +1,24 @@
-// Run after packaging/installing, with the ordinary App quit; restores the user's pet in finally.
+// Run after packaging; uses an isolated profile so the user's pet is untouched.
 import assert from 'node:assert/strict';
-import { readFile, writeFile, copyFile } from 'node:fs/promises';
-import { normalizePetConfig, serializePetPackage, parsePetPackage } from '../shared/pet-config.mjs';
+import { readFile, writeFile, copyFile, mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { PET, normalizePetConfig, serializePetPackage, parsePetPackage } from '../shared/pet-config.mjs';
 const { _electron } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright');
 const executablePath = process.env.CORNERPET_APP;
 assert.ok(executablePath, 'Set CORNERPET_APP to the packaged executable');
-const storage = `${process.env.HOME}/Library/Application Support/cornerpet/last-pet.cornerpet`;
-const backup = `${process.cwd()}/output/playwright/fit-scale-before.cornerpet`;
+const profile = await realpath(await mkdtemp(path.join(tmpdir(), 'cornerpet-accessory-size-')));
+const storage = path.join(profile, 'last-pet.cornerpet');
+const backup = path.join(profile, 'fit-scale-before.cornerpet');
+await writeFile(storage, serializePetPackage(PET));
 await copyFile(storage, backup);
 const original = parsePetPackage(await readFile(backup, 'utf8'));
-let app, page, restored = false;
+let app, page;
 const results = [];
 async function start() {
-  app = await _electron.launch({ executablePath, args: [] });
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'ELECTRON_RUN_AS_NODE'));
+  app = await _electron.launch({ executablePath, args: [`--user-data-dir=${profile}`], env });
+  assert.equal(await app.evaluate(({ app }) => app.getPath('userData')), profile);
   page = await app.firstWindow();
   await page.locator('.pet-grab').waitFor();
   await app.evaluate(({ Menu }) => {
@@ -51,6 +57,7 @@ async function applySize(percent) {
   assert.equal(parsePetPackage(await readFile(storage, 'utf8')).scale, percent / 100);
 }
 try {
+  await mkdir('output/playwright', { recursive: true });
   await start();
   assert.deepEqual(await page.evaluate(() => window.cornerpet.getConfig()), original);
   for (const [shape, accessory] of [['strawberry', 'flower'], ['mushroom', 'bow'], ['pudding', 'flower']]) {
@@ -71,7 +78,9 @@ try {
   const panelBounds = await (await app.browserWindow(panel)).evaluate(window => window.getBounds());
   await panel.getByRole('slider').fill('180');
   assert.equal(await panel.getByRole('spinbutton').inputValue(), '180');
-  await page.waitForFunction(() => window.cornerpet.getView().then(view => view.scale === 1.8));
+  await page.waitForFunction(() => Math.abs((document.querySelector('.desktop-pet')?.getBoundingClientRect().width ?? 0) - 280 * 1.8) < 1);
+  assert.ok(Math.abs((await page.locator('.desktop-pet').boundingBox()).width - 280 * 1.8) < 1, 'the pet is visibly previewed at 180%');
+  assert.equal((await page.evaluate(() => window.cornerpet.getView())).scale, 1.25);
   assert.equal((await page.evaluate(() => window.cornerpet.getConfig())).scale, 1.25);
   assert.equal(parsePetPackage(await readFile(storage, 'utf8')).scale, 1.25);
   assert.deepEqual(await (await app.browserWindow(panel)).evaluate(window => window.getBounds()), panelBounds);
@@ -112,10 +121,9 @@ try {
   await page.evaluate(scale => window.cornerpet.setScale(scale), original.scale);
   assert.deepEqual(await page.evaluate(() => window.cornerpet.getConfig()), original);
   assert.deepEqual(parsePetPackage(await readFile(storage, 'utf8')), original);
-  restored = true;
   await writeFile('output/playwright/fit-scale-native-results.json', JSON.stringify({ results, max, livePreview: true, previewNotSaved: true, cancel: true, invalid: true, restart: true, samePetRecall: true, originalRestored: true }, null, 2));
   console.log(JSON.stringify({ results, max, livePreview: true, previewNotSaved: true, cancel: true, invalid: true, restart: true, samePetRecall: true, originalRestored: true }));
 } finally {
   if (app) await app.close();
-  if (!restored) await copyFile(backup, storage);
+  await rm(profile, { recursive: true, force: true });
 }

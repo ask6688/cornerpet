@@ -5,7 +5,7 @@ import { PET, normalizePetConfig, serializePetPackage } from '../shared/pet-conf
 import { startDesktopHandoff } from './desktop-handoff';
 import { PetReactionControls } from '../shared/PetReactionControls';
 
-const MAC_INSTALLER_URL = 'https://github.com/ask6688/cornerpet/releases/download/v0.1.0/CornerPet-0.1.0-arm64.dmg';
+const MAC_INSTALLER_URL = 'https://github.com/ask6688/cornerpet/releases/download/v0.2.0/CornerPet-0.2.0-arm64.dmg';
 
 export function PetFinish({ pet, saveNote, saveState, onBusyChange, onChange, onRestart }: {
   pet: typeof PET; saveNote: string; saveState: 'saved' | 'saving' | 'failed'; onBusyChange: (busy: boolean) => void; onChange: (pet: typeof PET) => Promise<boolean>; onRestart: () => void;
